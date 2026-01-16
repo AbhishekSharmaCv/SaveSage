@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 24px;
+        }
+        
+        .section {
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #555;
+        }
+        
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            font-size: 12px;
+            padding: 8px 16px;
+            width: auto;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+        }
+        
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .card-item {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+        
+        .card-item:hover {
+            border-color: #667eea;
+        }
+        
+        .card-info {
+            flex: 1;
+        }
+        
+        .card-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #333;
+        }
+        
+        .card-details {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .card-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        
+        .message-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 Card Manager</h1>
+            <p>Add and manage your credit cards</p>
+        </div>
+        
+        <div class="content">
+            <!-- Add Card Form -->
+            <div class="section">
+                <h2 class="section-title">Add New Card</h2>
+                <div id="message-container"></div>
+                <form id="add-card-form">
+                    <div class="form-group">
+                        <label for="card-name">Card Name</label>
+                        <input type="text" id="card-name" name="cardName" placeholder="e.g., HDFC Infinia" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bank-name">Bank Name</label>
+                        <input type="text" id="bank-name" name="bankName" placeholder="e.g., HDFC" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reward-type">Reward Type</label>
+                        <select id="reward-type" name="rewardType" required>
+                            <option value="">Select reward type</option>
+                            <option value="points">Points</option>
+                            <option value="miles">Miles</option>
+                            <option value="cashback">Cashback</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="submit-btn">Add Card</button>
+                </form>
+            </div>
+            
+            <!-- Card List -->
+            <div class="section">
+                <h2 class="section-title">Your Cards</h2>
+                <div id="card-list-container">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Loading cards...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default user_id for MVP
+        const USER_ID = 1;
+        
+        // Get tool output data
+        let cardsData = [];
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Read initial data from tool output
+            if (window.openai && window.openai.toolOutput) {
+                try {
+                    const output = window.openai.toolOutput;
+                    // Handle different possible structures
+                    if (output.structuredContent && output.structuredContent.cards) {
+                        cardsData = output.structuredContent.cards;
+                        renderCards();
+                    } else if (output.cards) {
+                        cardsData = output.cards;
+                        renderCards();
+                    } else if (Array.isArray(output)) {
+                        cardsData = output;
+                        renderCards();
+                    }
+                } catch (e) {
+                    console.error('Error reading tool output:', e);
+                }
+            }
+            
+            // Load cards on mount (will refresh if tool output not available)
+            await loadCards();
+            
+            // Setup form handler
+            document.getElementById('add-card-form').addEventListener('submit', handleAddCard);
+        });
+        
+        // Load cards from MCP tool
+        async function loadCards() {
+            const container = document.getElementById('card-list-container');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading cards...</div></div>';
+            
+            try {
+                if (window.openai && window.openai.callTool) {
+                    const result = await window.openai.callTool('list_cards', { user_id: USER_ID });
+                    
+                    if (result && Array.isArray(result)) {
+                        cardsData = result;
+                        renderCards();
+                    } else if (result && result.status === 'error') {
+                        showMessage('Error loading cards: ' + result.message, 'error');
+                        renderCards();
+                    } else {
+                        cardsData = [];
+                        renderCards();
+                    }
+                } else {
+                    // Fallback: use tool output if available
+                    if (window.openai && window.openai.toolOutput) {
+                        const output = window.openai.toolOutput;
+                        if (output.structuredContent && output.structuredContent.cards) {
+                            cardsData = output.structuredContent.cards;
+                        } else if (output.cards) {
+                            cardsData = output.cards;
+                        } else {
+                            cardsData = [];
+                        }
+                    } else {
+                        cardsData = [];
+                    }
+                    renderCards();
+                }
+            } catch (error) {
+                console.error('Error loading cards:', error);
+                showMessage('Error loading cards. Please try again.', 'error');
+                cardsData = [];
+                renderCards();
+            }
+        }
+        
+        // Render cards list
+        function renderCards() {
+            const container = document.getElementById('card-list-container');
+            
+            if (cardsData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">💳</div>
+                        <div>No cards added yet</div>
+                        <div style="font-size: 12px; margin-top: 8px; color: #999;">Add your first card above</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="card-list">
+                    ${cardsData.map(card => `
+                        <div class="card-item">
+                            <div class="card-info">
+                                <div class="card-name">
+                                    ${escapeHtml(card.name)}
+                                    <span class="card-status ${card.active ? 'status-active' : 'status-inactive'}">
+                                        ${card.active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                                <div class="card-details">
+                                    ${escapeHtml(card.bank)} • ${capitalize(card.reward_type)}
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                ${card.active 
+                                    ? `<button class="btn btn-secondary" onclick="deactivateCard(${card.id})">Deactivate</button>`
+                                    : `<button class="btn btn-secondary" onclick="activateCard(${card.id})">Activate</button>`
+                                }
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // Handle add card form submission
+        async function handleAddCard(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const submitBtn = document.getElementById('submit-btn');
+            const cardName = document.getElementById('card-name').value.trim();
+            const bankName = document.getElementById('bank-name').value.trim();
+            const rewardType = document.getElementById('reward-type').value;
+            
+            if (!cardName || !bankName || !rewardType) {
+                showMessage('Please fill in all fields', 'error');
+                return;
+            }
+            
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+            
+            try {
+                if (window.openai && window.openai.callTool) {
+                    const result = await window.openai.callTool('add_card', {
+                        user_id: USER_ID,
+                        name: cardName,
+                        bank: bankName,
+                        reward_type: rewardType
+                    });
+                    
+                    if (result && result.status === 'success') {
+                        showMessage(`Card "${cardName}" added successfully!`, 'success');
+                        form.reset();
+                        await loadCards();
+                    } else {
+                        showMessage(result?.message || 'Error adding card', 'error');
+                    }
+                } else {
+                    showMessage('Tool API not available', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding card:', error);
+                showMessage('Error adding card. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Card';
+            }
+        }
+        
+        // Activate card
+        async function activateCard(cardId) {
+            try {
+                if (window.openai && window.openai.callTool) {
+                    const result = await window.openai.callTool('activate_card', {
+                        card_id: cardId
+                    });
+                    
+                    if (result && result.status === 'success') {
+                        showMessage(result.message, 'success');
+                        await loadCards();
+                    } else {
+                        showMessage(result?.message || 'Error activating card', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error activating card:', error);
+                showMessage('Error activating card', 'error');
+            }
+        }
+        
+        // Deactivate card
+        async function deactivateCard(cardId) {
+            try {
+                if (window.openai && window.openai.callTool) {
+                    const result = await window.openai.callTool('deactivate_card', {
+                        card_id: cardId
+                    });
+                    
+                    if (result && result.status === 'success') {
+                        showMessage(result.message, 'success');
+                        await loadCards();
+                    } else {
+                        showMessage(result?.message || 'Error deactivating card', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error deactivating card:', error);
+                showMessage('Error deactivating card', 'error');
+            }
+        }
+        
+        // Show message
+        function showMessage(text, type) {
+            const container = document.getElementById('message-container');
+            container.innerHTML = `<div class="message message-${type}">${escapeHtml(text)}</div>`;
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+        
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+        
+        // Make functions globally available for onclick handlers
+        window.activateCard = activateCard;
+        window.deactivateCard = deactivateCard;
+    </script>
+</body>
+</html>

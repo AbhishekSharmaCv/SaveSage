@@ -2,6 +2,7 @@ from fastmcp import FastMCP
 import os
 import aiosqlite
 import tempfile
+from pathlib import Path
 
 # Use temporary directory which should be writable
 TEMP_DIR = tempfile.gettempdir()
@@ -604,6 +605,93 @@ async def activate_card(card_id: int):
             }
     except Exception as e:
         return {"status": "error", "message": f"Error activating card: {str(e)}"}
+
+# ============================================================================
+# UI WIDGET RESOURCE
+# ============================================================================
+
+@mcp.resource("ui://widget/cards.html", mime_type="text/html+skybridge")
+def cards_widget():
+    """
+    HTML widget for card management UI.
+    Renders inline inside ChatGPT chat interface.
+    """
+    widget_path = Path(__file__).parent / "cards_widget.html"
+    try:
+        with open(widget_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<html><body><p>Widget file not found</p></body></html>"
+    except Exception as e:
+        return f"<html><body><p>Error loading widget: {str(e)}</p></body></html>"
+
+# ============================================================================
+# UI MANAGEMENT TOOL
+# ============================================================================
+
+@mcp.tool()
+async def manage_cards_ui(user_id: int = 1):
+    """
+    Open the card management UI widget.
+    This tool renders an inline UI inside ChatGPT for adding and managing credit cards.
+    
+    Args:
+        user_id: The user's ID (default: 1 for MVP)
+    
+    Returns:
+        Structured content with current cards list and widget reference.
+        
+    Tool metadata (for OpenAI Apps SDK):
+    - outputTemplate: ui://widget/cards.html
+    - widgetAccessible: true
+    - invoking: "Opening card manager..."
+    - invoked: "Here are your cards."
+    """
+    try:
+        # Fetch current cards for the widget
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """
+                SELECT id, name, bank, reward_type, active
+                FROM cards
+                WHERE user_id = ?
+                ORDER BY active DESC, name ASC
+                """,
+                (user_id,)
+            )
+            cols = [d[0] for d in cur.description]
+            rows = await cur.fetchall()
+            cards = [dict(zip(cols, r)) for r in rows]
+        
+        # Return structured content for widget
+        # The widget will access this via window.openai.toolOutput
+        return {
+            "structuredContent": {
+                "cards": cards,
+                "user_id": user_id
+            },
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Card manager opened. You have {len(cards)} card(s)."
+                }
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error loading card manager: {str(e)}",
+            "structuredContent": {
+                "cards": [],
+                "user_id": user_id
+            },
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Error loading card manager. Please try again."
+                }
+            ]
+        }
 
 # Start the server
 if __name__ == "__main__":
