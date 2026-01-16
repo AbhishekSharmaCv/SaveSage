@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rewards Balance</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: transparent;
+            padding: 16px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .summary {
+            background: #f8f9fa;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .summary-text {
+            font-size: 14px;
+            color: #555;
+            text-align: center;
+        }
+        
+        .totals {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
+        .total-card {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .total-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+        
+        .total-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        .balances-container {
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .balance-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        
+        .balance-card:hover {
+            border-color: #667eea;
+        }
+        
+        .balance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        
+        .card-info {
+            flex: 1;
+        }
+        
+        .card-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2px;
+        }
+        
+        .card-bank {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .balance-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #28a745;
+            text-align: right;
+        }
+        
+        .balance-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .detail-label {
+            color: #888;
+            margin-bottom: 2px;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .expiry-warning {
+            color: #dc3545;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+        
+        .update-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        
+        .update-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Rewards Balance</h1>
+            <p>Track your points, miles, and cashback</p>
+        </div>
+        <div class="summary" id="summary-section">
+            <div class="summary-text" id="summary-text">Loading balances...</div>
+            <div class="totals" id="totals-section"></div>
+        </div>
+        <div class="balances-container" id="balances-container">
+            <div class="empty-state">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            try {
+                // Get tool output data
+                const toolOutput = window.openai?.toolOutput || {};
+                const balances = toolOutput.balances || [];
+                const totals = toolOutput.totals || {};
+                const summary = toolOutput.summary || '';
+
+                // Update summary
+                const summaryText = document.getElementById('summary-text');
+                if (summaryText) {
+                    summaryText.textContent = summary || 'Your rewards summary';
+                }
+
+                // Render totals
+                const totalsSection = document.getElementById('totals-section');
+                if (totalsSection) {
+                    totalsSection.innerHTML = `
+                        <div class="total-card">
+                            <div class="total-value">${(totals.points || 0).toLocaleString()}</div>
+                            <div class="total-label">Points</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-value">${(totals.miles || 0).toLocaleString()}</div>
+                            <div class="total-label">Miles</div>
+                        </div>
+                        <div class="total-card">
+                            <div class="total-value">₹${(totals.cashback || 0).toFixed(2)}</div>
+                            <div class="total-label">Cashback</div>
+                        </div>
+                    `;
+                }
+
+                // Render balances
+                const container = document.getElementById('balances-container');
+                if (!balances || balances.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No rewards balances tracked yet. Add balances to your cards to see them here.</div>';
+                    return;
+                }
+
+                container.innerHTML = balances.map(balance => {
+                    const balanceValue = balance.balance || 0;
+                    const rewardType = balance.reward_type || 'points';
+                    const expiryDate = balance.expiry_date;
+                    const lastUpdated = balance.last_updated;
+                    const notes = balance.notes || '';
+
+                    // Check if expiring soon (within 90 days)
+                    let expiryWarning = '';
+                    if (expiryDate) {
+                        const expiry = new Date(expiryDate);
+                        const today = new Date();
+                        const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+                        if (daysUntilExpiry > 0 && daysUntilExpiry <= 90) {
+                            expiryWarning = `⚠️ Expires in ${daysUntilExpiry} days`;
+                        } else if (daysUntilExpiry <= 0) {
+                            expiryWarning = '⚠️ Expired';
+                        }
+                    }
+
+                    return `
+                        <div class="balance-card">
+                            <div class="balance-header">
+                                <div class="card-info">
+                                    <div class="card-name">${balance.name || 'Unknown Card'}</div>
+                                    <div class="card-bank">${balance.bank || ''}</div>
+                                </div>
+                                <div class="balance-value">${balanceValue.toLocaleString()}</div>
+                            </div>
+                            
+                            <div class="balance-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Reward Type</span>
+                                    <span class="detail-value">${rewardType}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Last Updated</span>
+                                    <span class="detail-value">${lastUpdated ? new Date(lastUpdated).toLocaleDateString() : 'Never'}</span>
+                                </div>
+                                ${expiryDate ? `
+                                    <div class="detail-item">
+                                        <span class="detail-label">Expiry Date</span>
+                                        <span class="detail-value">${new Date(expiryDate).toLocaleDateString()}</span>
+                                    </div>
+                                ` : ''}
+                                ${notes ? `
+                                    <div class="detail-item" style="grid-column: 1 / -1;">
+                                        <span class="detail-label">Notes</span>
+                                        <span class="detail-value">${notes}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            ${expiryWarning ? `<div class="expiry-warning">${expiryWarning}</div>` : ''}
+                            
+                            <button class="update-btn" onclick="updateBalance(${balance.id})">
+                                Update Balance
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error rendering rewards balance:', error);
+                document.getElementById('balances-container').innerHTML = 
+                    '<div class="empty-state">Error loading balances</div>';
+            }
+        })();
+
+        function updateBalance(cardId) {
+            // Prompt user to update balance
+            const newBalance = prompt(`Enter new balance for card ${cardId}:`);
+            if (newBalance && !isNaN(newBalance)) {
+                // Call tool to update balance
+                if (window.openai?.callTool) {
+                    window.openai.callTool('update_rewards_balance', {
+                        card_id: cardId,
+                        balance: parseFloat(newBalance)
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>

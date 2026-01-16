@@ -1,0 +1,75 @@
+SaveSage Core Functionality
+
+SaveSage is a credit‐card rewards optimizer that unifies all cards and loyalty programs in one place. It calls itself “your rewards management and optimization app” and promises to help users get “more value from your credit cards, airlines & hotels loyalty programs” on every spend. In practice, SaveSage lets a user add and manage multiple cards in one app – tracking balances, bills, points and offers across banks. Its “Savvy” AI assistant can be asked questions like “Which credit card should I use for this purchase?” or “How can I redeem hotel points?” and answers instantly with personalized advice.
+
+Key features of SaveSage include:
+
+Card Matching & Spend Guidance: SaveSage analyzes the user’s spending habits (across 100,000+ data points) to recommend which card earns the most rewards for each category. It effectively tells you “use Card A for dining and Card B for groceries” to maximize cashback or points.
+
+Personalized Card Recommendations: Based on demographics and spend patterns, SaveSage suggests new credit cards to add to your wallet. It “builds a deeply personalized credit card portfolio” tailored to your lifestyle, aiming to boost free travel, cashback, etc..
+
+Deal Surfacing & Gift Cards: The app constantly surfaces bank offers, merchant deals, and discounted gift cards. For example, SaveSage has “discounted gift cards — finally in the app” and even “weekly deals dropping on your favorite brands”. In short, it looks for any extra offers or coupons that can stack on top of card rewards.
+
+Cashback/Rewards Optimization: Beyond card matching, SaveSage tracks rewards points and shows how to redeem them (e.g. for flights/hotels). Its Travel-on-Points feature plans vacations by combining credit‐card and airline/hotel points. In sum, SaveSage helps turn everyday spending into savings – e.g. users reportedly went from ~2% back to ~14% back on spends.
+
+These capabilities (add/manage cards, smart Q&A, personalized card picks, deal alerts, and points-redeem planning) form the core SaveSage experience.
+
+Proposed ChatGPT App (Key Features)
+
+We can replicate SaveSage’s core functions in a ChatGPT “app” by combining chat flow with embedded UI widgets. Below are the main features to include, each with a chat-based UX and appropriate input forms or cards.
+
+Onboarding / Card Setup: Key need: let the user register their cards and loyalty accounts. Chat Experience: The bot asks “Which credit/debit cards do you have?” and presents an embedded form or multi-field card UI where the user can manually enter each card’s name, bank, type, and key benefits (or select from a dropdown of common banks/cards). For simplicity, the first version might just collect card names and fixed categories (e.g. “HDFC Diners, ICICI Amazon Pay”). Alternatively, a dynamic card-entry widget could allow scanning or selecting card images. Inputs: text fields for card name, dropdowns for card type or issuing bank, and numeric fields (e.g. credit limit or reward rate). Data: This uses a static, seeded database of card names and their reward structures (preloaded by admin).
+
+Card Matching & Cashback Optimization: Key need: advise the user which card to use per purchase category. Chat Experience: The user can ask questions or state a purchase (e.g. “I’m buying groceries worth ₹2000”). The assistant replies with an embedded card UI highlighting “Recommended Card: SBI Cashback Plus” (for example), with a short rationale (“₹2000 spent on groceries earns 5% back, which is higher on SBI Card than your others”). If multiple cards are good, use an inline carousel of cards side-by-side to compare (each item shows card name, image/logo, cashback rate, and a “Use this card” button). Inputs: The user can pick transaction category via buttons or dropdown (e.g. “Groceries”, “Dining”, “Online Shopping”), or type in merchant name. We might also allow free‐form: user says “Dining at XYZ restaurant” and the assistant uses merchant-category lookup. Data: The card-category mappings (which card pays best in each category) are static or seeded data. (No real-time fetching needed – use a hardcoded table of card benefits.)
+
+Deal Surfacing & Alerts: Key need: surface current offers on cards or merchants. Chat Experience: The app can proactively or on-demand show “hot deals” that match the user’s cards. For example, when the user says “Show me offers” or at app login, an embedded carousel can display active deals: each card with image, title (“10% off at ABC on Citi Card”), and a “Redeem” button. Alternatively, the bot can notify “New offers for you!” as a follow-up message with a list. Inputs: The user might filter by category (buttons: “Dining deals”, “Travel offers”, etc.) or toggle deal alerts on/off. Data: This requires external data (e.g. scraping partner offer pages or using APIs for bank promos). In an MVP, we could seed a small set of static sample deals (hardcoded promos) to demonstrate the feature. In future, this would integrate with real-time databases of card offers and gift‐card discounts.
+
+Personalized Card Recommendations: Key need: suggest new cards that the user doesn’t have. Chat Experience: After onboarding, the bot might say “Based on your spending, these cards could boost your rewards” and present an inline carousel of recommended cards. Each card in the carousel has name, key perks, an “Apply Now” link, and an “Ignore” option. This widget is lightweight (just a title, one benefit line, and two buttons) in line with ChatGPT UI guidelines. Inputs: The assistant may ask clarifying questions (via quick-reply buttons or dropdown: e.g. “Do you travel often?”, “Your annual fee budget?”). Or it could infer from the cards entered. Data: Card suggestion logic uses the static database of cards vs. user profile (e.g. travel frequency, spend categories). Initially, we can hardcode a few rules (e.g. if user has no travel card, recommend one with free lounge access). Later, this could incorporate machine learning or large datasets (offline) to match user profiles to card offers.
+
+Points/Rewards Tracking & Travel Redemption (Advanced): Key need: show loyalty program balances and point redemptions. Chat Experience: The bot could summarize “You have 120,000 AirMiles and 50,000 Payback points.” For travel, the user might type “Plan a trip to Goa with points.” The app then might open a larger view listing possible flights/hotels (this could be a “carousel” of options with points needed). Inputs: The user might input desired destination and travel dates (via text or a date-picker). Data: This feature needs external APIs (airline availability, loyalty programs) and is complex – likely beyond MVP. For a simple prototype, we might just skip real travel search and instead explain the concept via text or use a static mock-up of travel options.
+
+Interactive Chat (Savvy): Key need: allow free-form Q&A. Chat Experience: At any time, the user can ask the assistant arbitrary questions (“Do I have a lounge access on any card?” or “When do my points expire?”). The ChatGPT model can answer based on the user’s stored card data and known rules. We can enhance this by using the card database as context or tool calls. Inputs: Free text chat. Data: Mostly uses GPT knowledge and our card definitions (static). We won’t need new external sources here; the ChatGPT model itself can compute answers (like Savvy does) based on the inserted data.
+
+UI and Input Methods
+
+Embedded Cards and Carousels: We’ll use ChatGPT’s inline card UI to display structured results. For example, when recommending a credit card, show a single card widget with title (card name), an icon, a short description of its benefit (e.g. “5% back on dining, ₹1999 fee”), and buttons (“Add to Wallet”, “Learn More”). When multiple options exist, use an inline carousel of 3–5 cards so the user can scroll through recommendations or deals. Each carousel item should have an image/logo, a title line, a one-line subtitle, and a single clear action button. This clean, visual style lets users scan choices quickly.
+
+Forms and Input Controls: For onboarding, the assistant can render an inline form (an editable card) with text fields or dropdowns to input card details. For example, after the bot asks for your cards, it might present a card with labeled fields “Card Name” (text input), “Bank” (dropdown), and “Current Points” (numeric field). After submitting, the chat continues. For categorical queries, use buttons or dropdown menus. E.g., when asking “What did you buy?”, provide buttons like “Groceries”, “Dining”, “Flight”, etc., or a dropdown of merchants. Inline toggles or checkboxes could capture preferences (e.g. “Enable travel deals”).
+
+Chat Flow: The conversation remains chat-based but is interspersed with these widgets. For instance, the user might type “I spent ₹5000 on groceries this week.” The app responds with a card: “Use Card X for max points” with an explanation. Or the user might press a persistent “View Offers” button on the widget to update deals. Follow-up prompts (“Great choice!”) can guide next steps.
+
+Data Sources: Static vs. External
+
+Static/Admin-Seeded Data: Most core logic can use a built-in database of cards, categories, and rewards. This includes the details of each credit card (cashback rates, category bonuses, annual fees) and merchant category mappings. These can be pre-populated by the developer. All the recommendation rules (like which card is best for groceries) come from this static data. Also, any sample deals (e.g. an airline 50% bonus miles promo) can be hardcoded initially.
+
+External Data: To fully match SaveSage, some live data is needed. This includes real-time card offers, promotions, and gift-card discounts. For MVP we can use static examples, but a production app would call external APIs or scrape sources for “live offers” (bank reward portals, merchant coupon sites, etc.). Likewise, true travel point redemptions would require airline/hotel search APIs. These are advanced integrations; initially we can simulate them.
+
+MVP vs. Future Enhancements
+
+MVP (Phase 1) should focus on the essentials with smooth chat/UI flow:
+
+Basic onboarding: user enters existing cards (static list input).
+
+Simple card recommendation: user selects a spend category and chat returns the single best card (or a carousel of up to 3) with explanation.
+
+Static deal showcase: a handful of hardcoded offers are shown in a carousel (no live updating).
+
+A short Q&A ability: the bot can answer a few canned questions (e.g. “Which card gives lounge access?” based on static data).
+
+All of this in a clean chat UI with inline cards or forms; no external APIs needed yet.
+
+Advanced (Future) features could include:
+
+Real-time data feeds for live offers and personalized alerts (requires scraping/APIs).
+
+Full travel rewards planning, integrating airline/hotel availability.
+
+Automatic expense import (e.g. via SMS/email linking) instead of manual entry.
+
+Enhanced AI Savvy: using the latest GPT to answer more complex queries, perhaps even Voice/Img IO (like voice chat, receipt OCR).
+
+Social/Community features (SaveSage’s “polls” or “feeds”) if desired.
+
+Multi-lingual support, richer visualizations (graphs of spending), etc.
+
+Throughout, we would prioritize a smooth chat experience: prompts should be concise, visuals (cards/forms) used only for the key actions, and the conversation guiding the user step by step. By starting with the core flows (card entry, spend query, basic advice) and seeding the necessary data, the ChatGPT app can replicate the heart of SaveSage in a simple, interactive UI.

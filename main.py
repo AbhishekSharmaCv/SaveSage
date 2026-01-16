@@ -91,6 +91,31 @@ def init_db():
                 )
             """)
             
+            # Points/rewards tracking table
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS rewards_balance(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id INTEGER NOT NULL UNIQUE,
+                    balance REAL NOT NULL DEFAULT 0,
+                    expiry_date TEXT,
+                    last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT,
+                    FOREIGN KEY (card_id) REFERENCES cards(id)
+                )
+            """)
+            
+            # Merchant category mapping table
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS merchant_categories(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    merchant_name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    confidence REAL DEFAULT 1.0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(merchant_name, category)
+                )
+            """)
+            
             # Test write access
             c.execute("INSERT OR IGNORE INTO users(id, preference) VALUES (1, 'balanced')")
             c.execute("DELETE FROM users WHERE id = 1")
@@ -112,9 +137,58 @@ REWARD_VALUE_MAP = {
 # Canonical category list
 CANONICAL_CATEGORIES = ["travel", "dining", "shopping", "online", "fuel", "general", "other"]
 
+# Merchant to category mappings (common merchants)
+MERCHANT_CATEGORY_MAP = {
+    "swiggy": "dining",
+    "zomato": "dining",
+    "uber": "travel",
+    "ola": "travel",
+    "amazon": "shopping",
+    "flipkart": "shopping",
+    "myntra": "shopping",
+    "make my trip": "travel",
+    "goibibo": "travel",
+    "bookmyshow": "entertainment",
+    "netflix": "entertainment",
+    "spotify": "entertainment",
+    "irctc": "travel",
+    "indigo": "travel",
+    "spicejet": "travel",
+    "air india": "travel",
+    "oyo": "travel",
+    "taj": "travel",
+    "marriott": "travel",
+    "starbucks": "dining",
+    "dominos": "dining",
+    "pizza hut": "dining",
+    "mcdonalds": "dining",
+    "big bazaar": "shopping",
+    "dmart": "shopping",
+    "reliance": "shopping",
+    "hp": "fuel",
+    "bharat petroleum": "fuel",
+    "indian oil": "fuel",
+}
+
 def validate_category(category: str) -> bool:
     """Validate if category is in canonical list."""
     return category.lower() in CANONICAL_CATEGORIES
+
+def lookup_merchant_category(merchant_name: str) -> str:
+    """Look up category for a merchant name."""
+    merchant_lower = merchant_name.lower().strip()
+    
+    # Check exact match
+    if merchant_lower in MERCHANT_CATEGORY_MAP:
+        return MERCHANT_CATEGORY_MAP[merchant_lower]
+    
+    # Check partial match
+    for merchant, category in MERCHANT_CATEGORY_MAP.items():
+        if merchant in merchant_lower or merchant_lower in merchant:
+            return category
+    
+    # Default to "other" if no match
+    return "other"
 
 # ============================================================================
 # RESPONSE FORMAT CONTRACT
@@ -1321,6 +1395,293 @@ async def show_recommendations_ui(user_id: int = 1):
             "status": "error",
             "message": f"Error loading recommendations: {str(e)}",
             "structuredContent": {"recommendations": [], "user_id": user_id}
+        }
+
+# ============================================================================
+# POINTS/REWARDS TRACKING
+# ============================================================================
+
+@mcp.tool()
+async def get_rewards_balance(user_id: int = 1):
+    """
+    Get rewards balance summary for all user's cards.
+    
+    Args:
+        user_id: The user's ID
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """SELECT c.id, c.name, c.bank, c.reward_type, 
+                          COALESCE(rb.balance, 0) as balance,
+                          rb.expiry_date, rb.last_updated, rb.notes
+                   FROM cards c
+                   LEFT JOIN rewards_balance rb ON c.id = rb.card_id
+                   WHERE c.user_id = ? AND c.active = 1
+                   ORDER BY c.name ASC""",
+                (user_id,)
+            )
+            cols = [d[0] for d in cur.description]
+            rows = await cur.fetchall()
+            balances = [dict(zip(cols, r)) for r in rows]
+            
+            # Calculate totals by reward type
+            totals = {"points": 0, "miles": 0, "cashback": 0}
+            for balance in balances:
+                reward_type = balance.get("reward_type", "")
+                if reward_type in totals:
+                    totals[reward_type] += balance.get("balance", 0)
+            
+            return {
+                "balances": balances,
+                "totals": totals,
+                "summary": f"You have {totals['points']:,.0f} points, {totals['miles']:,.0f} miles, and ₹{totals['cashback']:,.2f} cashback"
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Error getting rewards balance: {str(e)}"}
+
+@mcp.tool()
+async def update_rewards_balance(card_id: int, balance: float, expiry_date: str = None, notes: str = ""):
+    """
+    Update or set rewards balance for a card.
+    
+    Args:
+        card_id: The card's ID
+        balance: Current balance (points, miles, or cashback amount)
+        expiry_date: Optional expiry date (YYYY-MM-DD)
+        notes: Optional notes
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Verify card exists
+            cur = await c.execute("SELECT id, name FROM cards WHERE id = ?", (card_id,))
+            card_row = await cur.fetchone()
+            if not card_row:
+                return {"status": "error", "message": f"Card with id {card_id} not found"}
+            
+            # Insert or update balance
+            cur = await c.execute(
+                """INSERT INTO rewards_balance(card_id, balance, expiry_date, notes, last_updated)
+                   VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(card_id) DO UPDATE SET
+                       balance = excluded.balance,
+                       expiry_date = excluded.expiry_date,
+                       notes = excluded.notes,
+                       last_updated = CURRENT_TIMESTAMP""",
+                (card_id, balance, expiry_date, notes)
+            )
+            await c.commit()
+            return {
+                "status": "success",
+                "message": f"Balance updated for card {card_row[1]}"
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Error updating balance: {str(e)}"}
+
+@mcp.tool()
+async def add_rewards(card_id: int, amount: float, notes: str = ""):
+    """
+    Add rewards to a card's balance (increment existing balance).
+    
+    Args:
+        card_id: The card's ID
+        amount: Amount to add
+        notes: Optional notes about the addition
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Get current balance
+            cur = await c.execute(
+                "SELECT balance FROM rewards_balance WHERE card_id = ?",
+                (card_id,)
+            )
+            row = await cur.fetchone()
+            current_balance = row[0] if row else 0.0
+            
+            new_balance = current_balance + amount
+            
+            # Update balance
+            return await update_rewards_balance(card_id, new_balance, notes=notes)
+    except Exception as e:
+        return {"status": "error", "message": f"Error adding rewards: {str(e)}"}
+
+# ============================================================================
+# MERCHANT CATEGORY LOOKUP
+# ============================================================================
+
+@mcp.tool()
+async def lookup_merchant(merchant_name: str):
+    """
+    Look up the spending category for a merchant name.
+    Returns the most likely category based on merchant name.
+    
+    Args:
+        merchant_name: Name of the merchant (e.g., "Swiggy", "Amazon", "Uber")
+    
+    Returns:
+        Suggested category and confidence level
+    """
+    try:
+        category = lookup_merchant_category(merchant_name)
+        
+        # Check database for custom mappings
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                "SELECT category, confidence FROM merchant_categories WHERE merchant_name = ?",
+                (merchant_name.lower(),)
+            )
+            row = await cur.fetchone()
+            if row:
+                category = row[0]
+                confidence = row[1]
+            else:
+                confidence = 0.8 if category != "other" else 0.5
+        
+        return {
+            "merchant": merchant_name,
+            "suggested_category": category,
+            "confidence": confidence,
+            "message": f"'{merchant_name}' is likely '{category}' category"
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error looking up merchant: {str(e)}"}
+
+@mcp.tool()
+async def add_merchant_mapping(merchant_name: str, category: str, confidence: float = 1.0):
+    """
+    Add a custom merchant to category mapping (admin function).
+    
+    Args:
+        merchant_name: Name of the merchant
+        category: Spending category (must be canonical)
+        confidence: Confidence level (0.0 to 1.0)
+    """
+    try:
+        if not validate_category(category):
+            return {
+                "status": "error",
+                "message": f"Category must be one of: {', '.join(CANONICAL_CATEGORIES)}"
+            }
+        
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """INSERT OR REPLACE INTO merchant_categories(merchant_name, category, confidence)
+                   VALUES (?, ?, ?)""",
+                (merchant_name.lower(), category.lower(), confidence)
+            )
+            await c.commit()
+            return {
+                "status": "success",
+                "message": f"Merchant mapping added: {merchant_name} -> {category}"
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Error adding merchant mapping: {str(e)}"}
+
+# ============================================================================
+# CARD COMPARISON WIDGET
+# ============================================================================
+
+@mcp.resource("ui://widget/comparison.html", mime_type="text/html+skybridge")
+def comparison_widget():
+    """HTML widget for comparing multiple cards side-by-side."""
+    widget_path = Path(__file__).parent / "comparison_widget.html"
+    try:
+        with open(widget_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<html><body><p>Comparison widget file not found</p></body></html>"
+    except Exception as e:
+        return f"<html><body><p>Error loading comparison widget: {str(e)}</p></body></html>"
+
+@mcp.resource("ui://widget/rewards.html", mime_type="text/html+skybridge")
+def rewards_widget():
+    """HTML widget for displaying rewards balance."""
+    widget_path = Path(__file__).parent / "rewards_widget.html"
+    try:
+        with open(widget_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<html><body><p>Rewards widget file not found</p></body></html>"
+    except Exception as e:
+        return f"<html><body><p>Error loading rewards widget: {str(e)}</p></body></html>"
+
+@mcp.tool()
+async def show_rewards_balance_ui(user_id: int = 1):
+    """
+    Show rewards balance UI widget.
+    
+    Args:
+        user_id: The user's ID
+    """
+    try:
+        result = await get_rewards_balance(user_id)
+        if isinstance(result, dict) and result.get("status") == "error":
+            return result
+        
+        balances = result.get("balances", [])
+        totals = result.get("totals", {})
+        summary = result.get("summary", "")
+        
+        return {
+            "structuredContent": {
+                "balances": balances,
+                "totals": totals,
+                "summary": summary,
+                "user_id": user_id
+            },
+            "content": [
+                {
+                    "type": "text",
+                    "text": summary or f"You have {len(balances)} card(s) with tracked balances"
+                }
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error loading rewards balance: {str(e)}",
+            "structuredContent": {"balances": [], "totals": {}, "user_id": user_id}
+        }
+
+@mcp.tool()
+async def show_card_comparison(user_id: int, spend_amount: float, category: str):
+    """
+    Show card comparison UI widget when multiple cards are close in value.
+    
+    Args:
+        user_id: The user's ID
+        spend_amount: Amount to spend
+        category: Spending category
+    """
+    try:
+        result = await recommend_best_card(user_id, spend_amount, category)
+        if isinstance(result, dict) and result.get("status") == "error":
+            return result
+        
+        estimates = result.get("estimates", [])
+        
+        # Filter to top 3 cards for comparison
+        top_cards = estimates[:3] if len(estimates) >= 3 else estimates
+        
+        return {
+            "structuredContent": {
+                "comparison": top_cards,
+                "spend_amount": spend_amount,
+                "category": category,
+                "user_id": user_id
+            },
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Comparing top {len(top_cards)} cards for ₹{spend_amount:,.0f} {category} spend"
+                }
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error showing comparison: {str(e)}",
+            "structuredContent": {"comparison": [], "spend_amount": spend_amount, "category": category}
         }
 
 # Start the server

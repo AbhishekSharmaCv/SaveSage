@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Comparison</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: transparent;
+            padding: 16px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .comparison-container {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        
+        .card-comparison {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+        
+        .card-comparison.best {
+            border-color: #28a745;
+            background: #f0fff4;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+        }
+        
+        .card-comparison:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        
+        .card-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .card-bank {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .best-badge {
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .value-highlight {
+            font-size: 24px;
+            font-weight: 700;
+            color: #28a745;
+            margin: 12px 0;
+        }
+        
+        .value-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        
+        .detail-label {
+            color: #666;
+        }
+        
+        .detail-value {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .earn-rate {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .cap-warning {
+            color: #dc3545;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        .action-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .action-btn:hover {
+            transform: scale(1.02);
+        }
+        
+        .action-btn.best {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Card Comparison</h1>
+            <p id="comparison-context">Comparing cards for your purchase</p>
+        </div>
+        <div class="comparison-container" id="comparison-container">
+            <div class="empty-state">Loading comparison...</div>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            try {
+                // Get tool output data
+                const toolOutput = window.openai?.toolOutput || {};
+                const structuredContent = toolOutput.structuredContent || {};
+                const comparison = structuredContent.comparison || [];
+                const spendAmount = structuredContent.spend_amount || 0;
+                const category = structuredContent.category || '';
+
+                // Update context
+                const contextEl = document.getElementById('comparison-context');
+                if (contextEl && spendAmount && category) {
+                    contextEl.textContent = `₹${spendAmount.toLocaleString()} ${category} spend`;
+                }
+
+                // Render comparison cards
+                const container = document.getElementById('comparison-container');
+                if (!comparison || comparison.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No cards to compare</div>';
+                    return;
+                }
+
+                // Find best card (highest estimated_value)
+                const bestCard = comparison.reduce((best, card) => {
+                    const bestValue = best?.estimated_value || 0;
+                    const cardValue = card?.estimated_value || 0;
+                    return cardValue > bestValue ? card : best;
+                }, null);
+
+                container.innerHTML = comparison.map(card => {
+                    const isBest = card.card_id === bestCard?.card_id;
+                    const estimatedValue = card.estimated_value || 0;
+                    const rewardsEarned = card.rewards_earned || 0;
+                    const earnRate = card.earn_rate || 0;
+                    const cap = card.cap;
+                    const capApplied = card.cap_applied;
+                    const rewardType = card.reward_type || 'points';
+                    const notes = card.notes || '';
+
+                    return `
+                        <div class="card-comparison ${isBest ? 'best' : ''}">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-name">${card.card_name || 'Unknown Card'}</div>
+                                    <div class="card-bank">${card.bank || ''}</div>
+                                </div>
+                                ${isBest ? '<div class="best-badge">Best</div>' : ''}
+                            </div>
+                            
+                            <div class="value-highlight">₹${estimatedValue.toFixed(2)}</div>
+                            <div class="value-label">Estimated Value</div>
+                            
+                            <div class="details">
+                                <div class="detail-row">
+                                    <span class="detail-label">Earn Rate:</span>
+                                    <span class="detail-value earn-rate">${earnRate}%</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Rewards:</span>
+                                    <span class="detail-value">${rewardsEarned.toFixed(2)} ${rewardType}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Category:</span>
+                                    <span class="detail-value">${card.category || category}</span>
+                                </div>
+                                ${cap ? `
+                                    <div class="detail-row">
+                                        <span class="detail-label">Cap:</span>
+                                        <span class="detail-value">₹${cap}</span>
+                                    </div>
+                                    ${capApplied ? '<div class="cap-warning">⚠️ Cap limit reached</div>' : ''}
+                                ` : ''}
+                                ${notes ? `
+                                    <div class="detail-row" style="margin-top: 8px; font-size: 11px; color: #666;">
+                                        ${notes}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            <button class="action-btn ${isBest ? 'best' : ''}" onclick="selectCard(${card.card_id})">
+                                ${isBest ? '✓ Use This Card' : 'Select Card'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error rendering comparison:', error);
+                document.getElementById('comparison-container').innerHTML = 
+                    '<div class="empty-state">Error loading comparison</div>';
+            }
+        })();
+
+        function selectCard(cardId) {
+            // Notify parent about card selection
+            if (window.openai?.callTool) {
+                // Could call a tool to track selection, or just show a message
+                alert(`Card ${cardId} selected! Use this card for your purchase.`);
+            }
+        }
+    </script>
+</body>
+</html>
