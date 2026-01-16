@@ -30,7 +30,28 @@ uv sync
 pip install -e .
 ```
 
-### 2. Start the Server
+### 2. Configure OpenAI API (Optional)
+
+For enhanced chat responses, set your OpenAI API key:
+
+```bash
+export OPENAI_API_KEY="sk-proj-your-api-key-here"
+```
+
+Or create a `.env` file with:
+```
+OPENAI_API_KEY=sk-proj-your-api-key-here
+```
+
+### 3. Seed Initial Data (Optional)
+
+Populate sample deals and available cards:
+
+```bash
+python3 seed_data.py
+```
+
+### 4. Start the Server
 
 ```bash
 python3 main.py
@@ -38,7 +59,7 @@ python3 main.py
 
 The server will start on `http://0.0.0.0:8000`. The database is automatically created in your system's temp directory (check console output for exact path).
 
-### 3. Connect to ChatGPT
+### 5. Connect to ChatGPT
 
 1. Configure your MCP client to connect to the server at `http://0.0.0.0:8000`
 2. Load the system prompt from `system_prompt.txt` into your ChatGPT configuration
@@ -172,6 +193,19 @@ Watch out:
 - `estimate_rewards(card_id, spend_amount, category)` - Estimate rewards for one card
 - `recommend_best_card(user_id, spend_amount, category)` - Compare all cards
 
+### Deals & Offers
+- `get_deals(user_id, category=None, card_id=None)` - Get active deals
+- `show_deals_ui(user_id, category=None)` - Show deals UI widget
+- `add_deal(...)` - Add a new deal (admin)
+
+### Card Recommendations
+- `recommend_new_cards(user_id, preference=None)` - Get personalized card recommendations
+- `show_recommendations_ui(user_id)` - Show recommendations UI widget
+- `add_available_card(...)` - Add available card to database (admin)
+
+### Enhanced Chat
+- `enhanced_chat_response(user_query, context="")` - Get OpenAI-powered responses
+
 **Note:** All tools return facts only. ChatGPT handles reasoning and recommendations.
 
 ## Response Format Contract
@@ -279,9 +313,32 @@ The app uses:
 **Database errors**
 → Check file permissions in temp directory (see console output for path)
 
+## New Features (SaveSage-style)
+
+### Deal Surfacing
+Users can ask "Show me deals" or "What offers do I have?" to see active deals and promotions for their cards. The deals widget displays:
+- Discount percentages and amounts
+- Valid until dates
+- Merchant information
+- Category filters
+
+### Card Recommendations
+The app suggests new cards users don't have based on their spending profile. Ask "What cards should I get?" to see personalized recommendations with:
+- Key benefits
+- Annual fees
+- Target audience matching
+
+### Enhanced Chat
+With OpenAI API configured, the app can answer complex questions like:
+- "Do I have lounge access on any card?"
+- "When do my points expire?"
+- "Which card is best for international travel?"
+
 ## Notes
 
 - Database is stored in system temp directory (check console output for exact path)
 - All tools return facts only - ChatGPT handles reasoning and recommendations
 - The system prompt enforces proper behavior and response format
+- OpenAI API key is optional but enables enhanced chat responses
+- Seed data script populates sample deals and available cards
 - This is an MVP intended to run inside ChatGPT as a conversational product

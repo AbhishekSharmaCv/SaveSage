@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deals & Offers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: transparent;
+            padding: 16px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .deals-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .deal-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+        
+        .deal-card:hover {
+            border-color: #f5576c;
+        }
+        
+        .deal-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .deal-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .deal-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        
+        .deal-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-discount {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-category {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .badge-merchant {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .deal-footer {
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #f5576c;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎁 Active Deals & Offers</h1>
+        </div>
+        <div class="deals-container" id="deals-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading deals...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+            
+            let dealsData = [];
+            
+            function init() {
+                if (window.openai && window.openai.toolOutput) {
+                    try {
+                        const output = window.openai.toolOutput;
+                        if (output.structuredContent && output.structuredContent.deals) {
+                            dealsData = output.structuredContent.deals;
+                            renderDeals();
+                        } else {
+                            loadDeals();
+                        }
+                    } catch (e) {
+                        console.error('Error reading tool output:', e);
+                        loadDeals();
+                    }
+                } else {
+                    loadDeals();
+                }
+                
+                if (window.openai && window.openai.onToolOutput) {
+                    window.openai.onToolOutput(function(newOutput) {
+                        try {
+                            if (newOutput && newOutput.structuredContent && newOutput.structuredContent.deals) {
+                                dealsData = newOutput.structuredContent.deals;
+                                renderDeals();
+                            }
+                        } catch (e) {
+                            console.error('Error handling tool output update:', e);
+                        }
+                    });
+                }
+            }
+            
+            async function loadDeals() {
+                const container = document.getElementById('deals-container');
+                if (!container) return;
+                
+                container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading deals...</div></div>';
+                
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        const result = await window.openai.callTool('get_deals', { user_id: 1 });
+                        if (result && Array.isArray(result)) {
+                            dealsData = result;
+                        } else {
+                            dealsData = [];
+                        }
+                    } else {
+                        dealsData = [];
+                    }
+                    renderDeals();
+                } catch (error) {
+                    console.error('Error loading deals:', error);
+                    dealsData = [];
+                    renderDeals();
+                }
+            }
+            
+            function renderDeals() {
+                const container = document.getElementById('deals-container');
+                if (!container) return;
+                
+                if (!dealsData || dealsData.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎁</div>
+                            <div>No active deals at the moment</div>
+                            <div style="font-size: 11px; margin-top: 6px; color: #999;">Check back later for new offers!</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = dealsData.map(deal => {
+                    const badges = [];
+                    if (deal.discount_percent) {
+                        badges.push(`<span class="deal-badge badge-discount">${deal.discount_percent}% OFF</span>`);
+                    }
+                    if (deal.category) {
+                        badges.push(`<span class="deal-badge badge-category">${escapeHtml(deal.category)}</span>`);
+                    }
+                    if (deal.merchant) {
+                        badges.push(`<span class="deal-badge badge-merchant">${escapeHtml(deal.merchant)}</span>`);
+                    }
+                    
+                    return `
+                        <div class="deal-card">
+                            <div class="deal-title">${escapeHtml(deal.title || 'Deal')}</div>
+                            ${deal.description ? `<div class="deal-description">${escapeHtml(deal.description)}</div>` : ''}
+                            ${badges.length > 0 ? `<div class="deal-details">${badges.join('')}</div>` : ''}
+                            ${deal.card_name ? `<div class="deal-details">Card: ${escapeHtml(deal.card_name)}</div>` : ''}
+                            ${deal.valid_until ? `<div class="deal-footer">Valid until: ${escapeHtml(deal.valid_until)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            function escapeHtml(text) {
+                if (text == null) return '';
+                const div = document.createElement('div');
+                div.textContent = String(text);
+                return div.innerHTML;
+            }
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+    </script>
+</body>
+</html>

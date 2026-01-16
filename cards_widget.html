@@ -13,14 +13,14 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
+            background: transparent;
+            padding: 16px;
             color: #333;
+            line-height: 1.5;
         }
         
         .container {
-            max-width: 600px;
-            margin: 0 auto;
+            max-width: 100%;
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -30,43 +30,47 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 24px;
+            padding: 20px;
             text-align: center;
         }
         
         .header h1 {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         
         .header p {
-            font-size: 14px;
+            font-size: 13px;
             opacity: 0.9;
         }
         
         .content {
-            padding: 24px;
+            padding: 20px;
         }
         
         .section {
-            margin-bottom: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .section:last-child {
+            margin-bottom: 0;
         }
         
         .section-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             color: #333;
         }
         
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         
         label {
             display: block;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             margin-bottom: 6px;
             color: #555;
@@ -75,10 +79,11 @@
         input[type="text"],
         select {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 14px;
+            font-family: inherit;
             transition: border-color 0.2s;
         }
         
@@ -92,52 +97,43 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 6px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: opacity 0.2s;
             width: 100%;
+            font-family: inherit;
         }
         
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
         }
         
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
         }
         
         .btn-secondary {
             background: #6c757d;
             font-size: 12px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             width: auto;
-        }
-        
-        .btn-secondary:hover {
-            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
         }
         
         .card-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         
         .card-item {
             background: #f8f9fa;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            padding: 16px;
+            padding: 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -153,22 +149,22 @@
         }
         
         .card-name {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             margin-bottom: 4px;
             color: #333;
         }
         
         .card-details {
-            font-size: 13px;
+            font-size: 12px;
             color: #666;
         }
         
         .card-status {
             display: inline-block;
-            padding: 4px 8px;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             margin-left: 8px;
         }
@@ -189,10 +185,10 @@
         }
         
         .message {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 13px;
         }
         
         .message-success {
@@ -209,29 +205,30 @@
         
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
+            padding: 30px 20px;
             color: #999;
         }
         
         .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
+            font-size: 40px;
+            margin-bottom: 12px;
         }
         
         .loading {
             text-align: center;
             padding: 20px;
             color: #666;
+            font-size: 13px;
         }
         
         .spinner {
             border: 3px solid #f3f3f3;
             border-top: 3px solid #667eea;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 12px;
+            margin: 0 auto 10px;
         }
         
         @keyframes spin {
@@ -291,240 +288,306 @@
     </div>
 
     <script>
-        // Default user_id for MVP
-        const USER_ID = 1;
-        
-        // Get tool output data
-        let cardsData = [];
-        
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Read initial data from tool output
-            if (window.openai && window.openai.toolOutput) {
-                try {
-                    const output = window.openai.toolOutput;
-                    // Handle different possible structures
-                    if (output.structuredContent && output.structuredContent.cards) {
-                        cardsData = output.structuredContent.cards;
-                        renderCards();
-                    } else if (output.cards) {
-                        cardsData = output.cards;
-                        renderCards();
-                    } else if (Array.isArray(output)) {
-                        cardsData = output;
-                        renderCards();
+        (function() {
+            'use strict';
+            
+            // State
+            let cardsData = [];
+            let userId = 1; // Default fallback
+            
+            // Initialize
+            function init() {
+                // Read initial data from tool output
+                if (window.openai && window.openai.toolOutput) {
+                    try {
+                        const output = window.openai.toolOutput;
+                        if (output.structuredContent) {
+                            if (output.structuredContent.cards) {
+                                cardsData = deduplicateCards(output.structuredContent.cards);
+                            }
+                            if (output.structuredContent.user_id) {
+                                userId = output.structuredContent.user_id;
+                            }
+                        } else if (output.cards) {
+                            cardsData = deduplicateCards(output.cards);
+                        } else if (Array.isArray(output)) {
+                            cardsData = deduplicateCards(output);
+                        }
+                        
+                        if (cardsData.length > 0) {
+                            renderCards();
+                        } else {
+                            loadCards();
+                        }
+                    } catch (e) {
+                        console.error('Error reading tool output:', e);
+                        loadCards();
                     }
-                } catch (e) {
-                    console.error('Error reading tool output:', e);
+                } else {
+                    loadCards();
+                }
+                
+                // Setup form handler
+                const form = document.getElementById('add-card-form');
+                if (form) {
+                    form.addEventListener('submit', handleAddCard);
+                }
+                
+                // Listen for tool output changes
+                if (window.openai && window.openai.onToolOutput) {
+                    window.openai.onToolOutput(function(newOutput) {
+                        try {
+                            if (newOutput && newOutput.structuredContent) {
+                                if (newOutput.structuredContent.cards) {
+                                    cardsData = deduplicateCards(newOutput.structuredContent.cards);
+                                    renderCards();
+                                }
+                                if (newOutput.structuredContent.user_id) {
+                                    userId = newOutput.structuredContent.user_id;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error handling tool output update:', e);
+                        }
+                    });
                 }
             }
             
-            // Load cards on mount (will refresh if tool output not available)
-            await loadCards();
+            // Deduplicate cards by id
+            function deduplicateCards(cards) {
+                if (!Array.isArray(cards)) return [];
+                const seen = new Set();
+                return cards.filter(card => {
+                    if (!card || !card.id) return false;
+                    if (seen.has(card.id)) return false;
+                    seen.add(card.id);
+                    return true;
+                });
+            }
             
-            // Setup form handler
-            document.getElementById('add-card-form').addEventListener('submit', handleAddCard);
-        });
-        
-        // Load cards from MCP tool
-        async function loadCards() {
-            const container = document.getElementById('card-list-container');
-            container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading cards...</div></div>';
-            
-            try {
-                if (window.openai && window.openai.callTool) {
-                    const result = await window.openai.callTool('list_cards', { user_id: USER_ID });
-                    
-                    if (result && Array.isArray(result)) {
-                        cardsData = result;
-                        renderCards();
-                    } else if (result && result.status === 'error') {
-                        showMessage('Error loading cards: ' + result.message, 'error');
-                        renderCards();
+            // Load cards from MCP tool
+            async function loadCards() {
+                const container = document.getElementById('card-list-container');
+                if (!container) return;
+                
+                container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading cards...</div></div>';
+                
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        const result = await window.openai.callTool('list_cards', { user_id: userId });
+                        
+                        if (result && Array.isArray(result)) {
+                            cardsData = deduplicateCards(result);
+                            renderCards();
+                        } else if (result && result.status === 'error') {
+                            showMessage('Error loading cards: ' + (result.message || 'Unknown error'), 'error');
+                            cardsData = [];
+                            renderCards();
+                        } else {
+                            cardsData = [];
+                            renderCards();
+                        }
                     } else {
-                        cardsData = [];
-                        renderCards();
-                    }
-                } else {
-                    // Fallback: use tool output if available
-                    if (window.openai && window.openai.toolOutput) {
-                        const output = window.openai.toolOutput;
-                        if (output.structuredContent && output.structuredContent.cards) {
-                            cardsData = output.structuredContent.cards;
-                        } else if (output.cards) {
-                            cardsData = output.cards;
+                        // Fallback: use tool output if available
+                        if (window.openai && window.openai.toolOutput) {
+                            const output = window.openai.toolOutput;
+                            if (output.structuredContent && output.structuredContent.cards) {
+                                cardsData = deduplicateCards(output.structuredContent.cards);
+                            } else {
+                                cardsData = [];
+                            }
                         } else {
                             cardsData = [];
                         }
-                    } else {
-                        cardsData = [];
+                        renderCards();
                     }
+                } catch (error) {
+                    console.error('Error loading cards:', error);
+                    showMessage('Error loading cards. Please try again.', 'error');
+                    cardsData = [];
                     renderCards();
                 }
-            } catch (error) {
-                console.error('Error loading cards:', error);
-                showMessage('Error loading cards. Please try again.', 'error');
-                cardsData = [];
-                renderCards();
             }
-        }
-        
-        // Render cards list
-        function renderCards() {
-            const container = document.getElementById('card-list-container');
             
-            if (cardsData.length === 0) {
+            // Render cards list
+            function renderCards() {
+                const container = document.getElementById('card-list-container');
+                if (!container) return;
+                
+                if (cardsData.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💳</div>
+                            <div>No cards added yet</div>
+                            <div style="font-size: 11px; margin-top: 6px; color: #999;">Add your first card above</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
                 container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">💳</div>
-                        <div>No cards added yet</div>
-                        <div style="font-size: 12px; margin-top: 8px; color: #999;">Add your first card above</div>
+                    <div class="card-list">
+                        ${cardsData.map(card => `
+                            <div class="card-item">
+                                <div class="card-info">
+                                    <div class="card-name">
+                                        ${escapeHtml(card.name || 'Unknown')}
+                                        <span class="card-status ${card.active ? 'status-active' : 'status-inactive'}">
+                                            ${card.active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                    <div class="card-details">
+                                        ${escapeHtml(card.bank || 'Unknown')} • ${capitalize(card.reward_type || 'unknown')}
+                                    </div>
+                                </div>
+                                <div class="card-actions">
+                                    ${card.active 
+                                        ? `<button class="btn btn-secondary" onclick="window.cardManager.deactivateCard(${card.id})">Deactivate</button>`
+                                        : `<button class="btn btn-secondary" onclick="window.cardManager.activateCard(${card.id})">Activate</button>`
+                                    }
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
                 `;
-                return;
             }
             
-            container.innerHTML = `
-                <div class="card-list">
-                    ${cardsData.map(card => `
-                        <div class="card-item">
-                            <div class="card-info">
-                                <div class="card-name">
-                                    ${escapeHtml(card.name)}
-                                    <span class="card-status ${card.active ? 'status-active' : 'status-inactive'}">
-                                        ${card.active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
-                                <div class="card-details">
-                                    ${escapeHtml(card.bank)} • ${capitalize(card.reward_type)}
-                                </div>
-                            </div>
-                            <div class="card-actions">
-                                ${card.active 
-                                    ? `<button class="btn btn-secondary" onclick="deactivateCard(${card.id})">Deactivate</button>`
-                                    : `<button class="btn btn-secondary" onclick="activateCard(${card.id})">Activate</button>`
-                                }
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-        }
-        
-        // Handle add card form submission
-        async function handleAddCard(e) {
-            e.preventDefault();
-            
-            const form = e.target;
-            const submitBtn = document.getElementById('submit-btn');
-            const cardName = document.getElementById('card-name').value.trim();
-            const bankName = document.getElementById('bank-name').value.trim();
-            const rewardType = document.getElementById('reward-type').value;
-            
-            if (!cardName || !bankName || !rewardType) {
-                showMessage('Please fill in all fields', 'error');
-                return;
-            }
-            
-            // Disable button
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Adding...';
-            
-            try {
-                if (window.openai && window.openai.callTool) {
-                    const result = await window.openai.callTool('add_card', {
-                        user_id: USER_ID,
-                        name: cardName,
-                        bank: bankName,
-                        reward_type: rewardType
-                    });
-                    
-                    if (result && result.status === 'success') {
-                        showMessage(`Card "${cardName}" added successfully!`, 'success');
-                        form.reset();
-                        await loadCards();
-                    } else {
-                        showMessage(result?.message || 'Error adding card', 'error');
-                    }
-                } else {
-                    showMessage('Tool API not available', 'error');
+            // Handle add card form submission
+            async function handleAddCard(e) {
+                e.preventDefault();
+                
+                const form = e.target;
+                const submitBtn = document.getElementById('submit-btn');
+                const cardName = document.getElementById('card-name').value.trim();
+                const bankName = document.getElementById('bank-name').value.trim();
+                const rewardType = document.getElementById('reward-type').value;
+                
+                if (!cardName || !bankName || !rewardType) {
+                    showMessage('Please fill in all fields', 'error');
+                    return;
                 }
-            } catch (error) {
-                console.error('Error adding card:', error);
-                showMessage('Error adding card. Please try again.', 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Add Card';
-            }
-        }
-        
-        // Activate card
-        async function activateCard(cardId) {
-            try {
-                if (window.openai && window.openai.callTool) {
-                    const result = await window.openai.callTool('activate_card', {
-                        card_id: cardId
-                    });
-                    
-                    if (result && result.status === 'success') {
-                        showMessage(result.message, 'success');
-                        await loadCards();
+                
+                // Disable button
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Adding...';
+                }
+                
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        const result = await window.openai.callTool('add_card', {
+                            user_id: userId,
+                            name: cardName,
+                            bank: bankName,
+                            reward_type: rewardType
+                        });
+                        
+                        if (result && result.status === 'success') {
+                            showMessage(`Card "${cardName}" added successfully!`, 'success');
+                            if (form) form.reset();
+                            // Refresh card list
+                            await loadCards();
+                        } else {
+                            const errorMsg = result?.message || 'Error adding card';
+                            showMessage(errorMsg, 'error');
+                        }
                     } else {
-                        showMessage(result?.message || 'Error activating card', 'error');
+                        showMessage('Tool API not available', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error adding card:', error);
+                    showMessage('Error adding card. Please try again.', 'error');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Add Card';
                     }
                 }
-            } catch (error) {
-                console.error('Error activating card:', error);
-                showMessage('Error activating card', 'error');
             }
-        }
-        
-        // Deactivate card
-        async function deactivateCard(cardId) {
-            try {
-                if (window.openai && window.openai.callTool) {
-                    const result = await window.openai.callTool('deactivate_card', {
-                        card_id: cardId
-                    });
-                    
-                    if (result && result.status === 'success') {
-                        showMessage(result.message, 'success');
-                        await loadCards();
-                    } else {
-                        showMessage(result?.message || 'Error deactivating card', 'error');
-                    }
-                }
-            } catch (error) {
-                console.error('Error deactivating card:', error);
-                showMessage('Error deactivating card', 'error');
-            }
-        }
-        
-        // Show message
-        function showMessage(text, type) {
-            const container = document.getElementById('message-container');
-            container.innerHTML = `<div class="message message-${type}">${escapeHtml(text)}</div>`;
             
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                container.innerHTML = '';
-            }, 5000);
-        }
-        
-        // Utility functions
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function capitalize(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1);
-        }
-        
-        // Make functions globally available for onclick handlers
-        window.activateCard = activateCard;
-        window.deactivateCard = deactivateCard;
+            // Activate card
+            async function activateCard(cardId) {
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        const result = await window.openai.callTool('activate_card', {
+                            card_id: cardId
+                        });
+                        
+                        if (result && result.status === 'success') {
+                            showMessage(result.message || 'Card activated successfully', 'success');
+                            await loadCards();
+                        } else {
+                            showMessage(result?.message || 'Error activating card', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error activating card:', error);
+                    showMessage('Error activating card', 'error');
+                }
+            }
+            
+            // Deactivate card
+            async function deactivateCard(cardId) {
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        const result = await window.openai.callTool('deactivate_card', {
+                            card_id: cardId
+                        });
+                        
+                        if (result && result.status === 'success') {
+                            showMessage(result.message || 'Card deactivated successfully', 'success');
+                            await loadCards();
+                        } else {
+                            showMessage(result?.message || 'Error deactivating card', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error deactivating card:', error);
+                    showMessage('Error deactivating card', 'error');
+                }
+            }
+            
+            // Show message
+            function showMessage(text, type) {
+                const container = document.getElementById('message-container');
+                if (!container) return;
+                
+                container.innerHTML = `<div class="message message-${type}">${escapeHtml(text)}</div>`;
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    if (container) {
+                        container.innerHTML = '';
+                    }
+                }, 5000);
+            }
+            
+            // Utility functions
+            function escapeHtml(text) {
+                if (text == null) return '';
+                const div = document.createElement('div');
+                div.textContent = String(text);
+                return div.innerHTML;
+            }
+            
+            function capitalize(str) {
+                if (!str) return '';
+                return String(str).charAt(0).toUpperCase() + String(str).slice(1);
+            }
+            
+            // Expose functions globally for onclick handlers
+            window.cardManager = {
+                activateCard: activateCard,
+                deactivateCard: deactivateCard
+            };
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
     </script>
 </body>
 </html>
