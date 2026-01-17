@@ -134,8 +134,8 @@ REWARD_VALUE_MAP = {
     "cashback": 1.0
 }
 
-# Canonical category list
-CANONICAL_CATEGORIES = ["travel", "dining", "shopping", "online", "fuel", "general", "other"]
+# Canonical category list (includes US categories: groceries, gas)
+CANONICAL_CATEGORIES = ["travel", "dining", "shopping", "online", "fuel", "gas", "groceries", "general", "other"]
 
 # Merchant to category mappings (common merchants)
 MERCHANT_CATEGORY_MAP = {
@@ -190,13 +190,83 @@ def lookup_merchant_category(merchant_name: str) -> str:
     # Default to "other" if no match
     return "other"
 
+async def auto_seed_reward_rules(card_id: int, card_name: str):
+    """
+    Auto-seed reward rules from us_cards.json if card name matches.
+    This removes admin burden by automatically creating reward rules.
+    """
+    try:
+        us_cards_path = Path(__file__).parent / "data" / "us_cards.json"
+        if not us_cards_path.exists():
+            return 0  # No US cards data file, skip auto-seed
+        
+        with open(us_cards_path, "r", encoding="utf-8") as f:
+            us_cards = json.load(f)
+        
+        # Find matching card by name (case-insensitive)
+        matched_card = None
+        for card in us_cards:
+            if card["name"].lower() == card_name.lower():
+                matched_card = card
+                break
+        
+        if not matched_card:
+            return 0  # Card not in US cards database, skip
+        
+        # Map categories: "gas" -> "fuel" for compatibility, "groceries" stays as is
+        category_mapping = {
+            "gas": "fuel",  # Map gas to fuel for compatibility
+            "groceries": "groceries"  # Keep groceries as is (added to canonical list)
+        }
+        
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Check if rules already exist for this card
+            cur = await c.execute(
+                "SELECT COUNT(*) FROM reward_rules WHERE card_id = ?",
+                (card_id,)
+            )
+            existing_count = (await cur.fetchone())[0]
+            if existing_count > 0:
+                return 0  # Rules already exist, skip to allow manual override
+            
+            # Create reward rules from card data
+            rules_created = 0
+            for category, earn_rate in matched_card.get("categories", {}).items():
+                if earn_rate > 0:
+                    # Map category if needed
+                    db_category = category_mapping.get(category, category)
+                    # Only add if category is in canonical list
+                    if db_category in CANONICAL_CATEGORIES or category in CANONICAL_CATEGORIES:
+                        final_category = db_category if db_category in CANONICAL_CATEGORIES else category
+                        # Check if rule already exists
+                        cur = await c.execute(
+                            "SELECT id FROM reward_rules WHERE card_id = ? AND category = ?",
+                            (card_id, final_category)
+                        )
+                        if not await cur.fetchone():
+                            await c.execute(
+                                "INSERT INTO reward_rules(card_id, category, earn_rate, notes) VALUES (?, ?, ?, ?)",
+                                (card_id, final_category, earn_rate, f"Auto-seeded from us_cards.json")
+                            )
+                            rules_created += 1
+            
+            await c.commit()
+            if rules_created > 0:
+                print(f"Auto-seeded {rules_created} reward rules for {card_name}")
+                return rules_created
+            return 0
+    except Exception as e:
+        print(f"Error auto-seeding reward rules for {card_name}: {e}")
+        # Don't fail card addition if auto-seed fails
+        return 0
+
 # ============================================================================
 # RESPONSE FORMAT CONTRACT
 # ============================================================================
 # Every recommendation response from ChatGPT MUST follow this format:
 #
 # ✅ Best card: <card_name>
-# 💰 Estimated value: ₹<value>
+# 💰 Estimated value: $<value>
 #
 # Why:
 # • <reason 1>
@@ -207,9 +277,10 @@ def lookup_merchant_category(merchant_name: str) -> str:
 #
 # Required elements:
 # - Best card name (from recommend_best_card tool results)
-# - Estimated value in ₹ (use estimated_value from tool results)
+# - Estimated value in $ (use estimated_value from tool results)
 # - Clear explanation ("why") - explain earn rate, category match, etc.
 # - Warnings ("watch out") - caps, limits, when to switch cards
+# - If top 2 cards are within 10% value, explain trade-offs instead of forcing single choice
 #
 # This format is enforced by the system prompt. MCP tools return facts only;
 # ChatGPT formats the recommendation using this structure.
@@ -293,6 +364,10 @@ async def add_card(user_id: int, name: str, bank: str, reward_type: str):
             )
             card_id = cur.lastrowid
             await c.commit()
+            
+            # Auto-seed reward rules from us_cards.json if available
+            await auto_seed_reward_rules(card_id, name)
+            
             return {
                 "status": "success",
                 "id": card_id,
@@ -661,6 +736,18 @@ async def recommend_best_card(user_id: int, spend_amount: float, category: str):
             # Sort by estimated_value descending (fallback to rewards_earned)
             estimates.sort(key=lambda x: x.get('estimated_value', x.get('rewards_earned', 0)), reverse=True)
             
+            # Check if top 2 cards are within 10% - if so, mark for trade-off explanation
+            if len(estimates) >= 2:
+                top_value = estimates[0].get('estimated_value', 0)
+                second_value = estimates[1].get('estimated_value', 0)
+                if top_value > 0:
+                    value_diff_pct = abs(top_value - second_value) / top_value
+                    if value_diff_pct <= 0.10:  # Within 10%
+                        # Mark top 2 cards as close for trade-off explanation
+                        estimates[0]['close_tie'] = True
+                        estimates[1]['close_tie'] = True
+                        estimates[0]['trade_off_needed'] = True
+            
             # Use AI for tie-breaking and nuanced recommendations when cards are close
             client = get_openai_client()
             if client and len(estimates) > 1:
@@ -675,7 +762,7 @@ async def recommend_best_card(user_id: int, spend_amount: float, category: str):
                             prompt = f"""You are a credit card rewards strategist. Break a tie between cards with very similar reward values.
 
 User Preference: {user_preference}
-Spend Amount: ₹{spend_amount}
+Spend Amount: ${spend_amount}
 Category: {category}
 
 Cards (already sorted by estimated value):
@@ -794,6 +881,285 @@ async def activate_card(card_id: int):
     except Exception as e:
         return {"status": "error", "message": f"Error activating card: {str(e)}"}
 
+@mcp.tool()
+async def simulate_monthly_spend(user_id: int, dining: float = 0, groceries: float = 0, 
+                                 travel: float = 0, gas: float = 0, general: float = 0):
+    """
+    Simulate monthly spending and calculate annual rewards per card.
+    Returns total annual rewards per card, best overall card, and missed value.
+    
+    Args:
+        user_id: The user's ID
+        dining: Monthly dining spend
+        groceries: Monthly groceries spend
+        travel: Monthly travel spend
+        gas: Monthly gas spend
+        general: Monthly general spend
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Get all active cards for user
+            cur = await c.execute(
+                "SELECT id, name, bank, reward_type FROM cards WHERE user_id = ? AND active = 1",
+                (user_id,)
+            )
+            cards = await cur.fetchall()
+            
+            if not cards:
+                return {"status": "error", "message": f"No active cards found for user {user_id}"}
+            
+            monthly_spend = {
+                "dining": dining,
+                "groceries": groceries,
+                "travel": travel,
+                "gas": gas,
+                "general": general
+            }
+            
+            results = []
+            total_monthly = sum(monthly_spend.values())
+            
+            for card_id, card_name, bank, reward_type in cards:
+                # Get reward rules for this card
+                cur = await c.execute(
+                    "SELECT category, earn_rate, cap FROM reward_rules WHERE card_id = ?",
+                    (card_id,)
+                )
+                rules = await cur.fetchall()
+                
+                # Calculate monthly rewards by category
+                monthly_rewards = 0
+                category_details = {}
+                
+                for category, spend_amount in monthly_spend.items():
+                    if spend_amount > 0:
+                        # Find matching rule (exact match or fallback to general/other)
+                        rule = None
+                        for rule_category, earn_rate, cap in rules:
+                            if rule_category == category:
+                                rule = (rule_category, earn_rate, cap)
+                                break
+                        
+                        if not rule:
+                            # Try general fallback
+                            for rule_category, earn_rate, cap in rules:
+                                if rule_category == "general":
+                                    rule = (rule_category, earn_rate, cap)
+                                    break
+                        
+                        if not rule:
+                            # Try other fallback
+                            for rule_category, earn_rate, cap in rules:
+                                if rule_category == "other":
+                                    rule = (rule_category, earn_rate, cap)
+                                    break
+                        
+                        if rule:
+                            rule_category, earn_rate, cap = rule
+                            category_rewards = spend_amount * (earn_rate / 100)
+                            
+                            # Apply cap if exists (monthly cap, so divide by 12 for annual)
+                            if cap is not None:
+                                annual_cap = cap * 12  # Convert to annual
+                                annual_category_rewards = min(category_rewards * 12, annual_cap)
+                                category_rewards = annual_category_rewards / 12
+                            
+                            monthly_rewards += category_rewards
+                            category_details[category] = {
+                                "earn_rate": earn_rate,
+                                "rewards": round(category_rewards, 2)
+                            }
+                
+                # Calculate annual rewards
+                annual_rewards = monthly_rewards * 12
+                
+                # Calculate estimated value
+                value_multiplier = REWARD_VALUE_MAP.get(reward_type, 1.0)
+                estimated_annual_value = round(annual_rewards * value_multiplier, 2)
+                
+                results.append({
+                    "card_id": card_id,
+                    "card_name": card_name,
+                    "bank": bank,
+                    "reward_type": reward_type,
+                    "monthly_rewards": round(monthly_rewards, 2),
+                    "annual_rewards": round(annual_rewards, 2),
+                    "estimated_annual_value": estimated_annual_value,
+                    "category_details": category_details
+                })
+            
+            # Sort by estimated annual value
+            results.sort(key=lambda x: x['estimated_annual_value'], reverse=True)
+            best_card = results[0] if results else None
+            
+            # Calculate missed value (categories with no good card coverage)
+            missed_opportunities = []
+            for category, spend_amount in monthly_spend.items():
+                if spend_amount > 0:
+                    # Find best earn rate for this category across all cards
+                    best_rate = 0
+                    for result in results:
+                        if category in result['category_details']:
+                            rate = result['category_details'][category]['earn_rate']
+                            best_rate = max(best_rate, rate)
+                    
+                    # If best rate is low (<= 1.5%), suggest improvement
+                    if best_rate <= 1.5:
+                        annual_spend = spend_amount * 12
+                        potential_improvement = annual_spend * 0.03  # Assume 3% could be achieved
+                        missed_opportunities.append({
+                            "category": category,
+                            "current_best_rate": best_rate,
+                            "annual_spend": round(annual_spend, 2),
+                            "potential_improvement": round(potential_improvement, 2)
+                        })
+            
+            return {
+                "monthly_spend": monthly_spend,
+                "total_monthly_spend": round(total_monthly, 2),
+                "results": results,
+                "best_card": best_card,
+                "missed_opportunities": missed_opportunities
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Error simulating spend: {str(e)}"}
+
+@mcp.tool()
+async def analyze_wallet_gaps(user_id: int):
+    """
+    Analyze user's wallet for missing cards, overlapping cards, and redundant cards.
+    Returns recommendations for cards to add and estimated value increase.
+    
+    Args:
+        user_id: The user's ID
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Get user's active cards with reward rules
+            cur = await c.execute(
+                """
+                SELECT c.id, c.name, c.bank, c.reward_type, r.category, r.earn_rate
+                FROM cards c
+                LEFT JOIN reward_rules r ON c.id = r.card_id
+                WHERE c.user_id = ? AND c.active = 1
+                ORDER BY c.name, r.category
+                """,
+                (user_id,)
+            )
+            card_data = await cur.fetchall()
+            
+            if not card_data:
+                return {
+                    "status": "error",
+                    "message": f"No active cards found for user {user_id}"
+                }
+            
+            # Organize by category
+            category_coverage = {}
+            card_categories = {}
+            
+            for card_id, card_name, bank, reward_type, category, earn_rate in card_data:
+                if category:
+                    if category not in category_coverage:
+                        category_coverage[category] = []
+                    category_coverage[category].append({
+                        "card_id": card_id,
+                        "card_name": card_name,
+                        "bank": bank,
+                        "earn_rate": earn_rate
+                    })
+                    
+                    if card_id not in card_categories:
+                        card_categories[card_id] = {
+                            "name": card_name,
+                            "bank": bank,
+                            "categories": {}
+                        }
+                    card_categories[card_id]["categories"][category] = earn_rate
+            
+            # Identify gaps (categories with no card or low earn rates)
+            gaps = []
+            important_categories = ["groceries", "dining", "travel", "gas"]
+            
+            for category in important_categories:
+                if category not in category_coverage:
+                    gaps.append({
+                        "category": category,
+                        "issue": "no_coverage",
+                        "message": f"No card covers {category} category"
+                    })
+                else:
+                    max_rate = max([c["earn_rate"] for c in category_coverage[category]])
+                    if max_rate <= 1.5:  # Low earn rate
+                        gaps.append({
+                            "category": category,
+                            "issue": "low_rate",
+                            "current_best_rate": max_rate,
+                            "message": f"Best {category} rate is only {max_rate}%"
+                        })
+            
+            # Identify overlapping cards (multiple cards with similar high rates for same category)
+            overlaps = []
+            for category, cards in category_coverage.items():
+                if len(cards) > 1:
+                    high_rate_cards = [c for c in cards if c["earn_rate"] >= 3.0]
+                    if len(high_rate_cards) > 1:
+                        overlaps.append({
+                            "category": category,
+                            "cards": high_rate_cards,
+                            "message": f"Multiple cards with high {category} rates: {', '.join([c['card_name'] for c in high_rate_cards])}"
+                        })
+            
+            # Load US cards data to suggest additions
+            recommendations = []
+            us_cards_path = Path(__file__).parent / "data" / "us_cards.json"
+            if us_cards_path.exists():
+                with open(us_cards_path, "r", encoding="utf-8") as f:
+                    us_cards = json.load(f)
+                
+                # Get user's existing card names
+                cur = await c.execute(
+                    "SELECT name FROM cards WHERE user_id = ?",
+                    (user_id,)
+                )
+                existing_card_names = {row[0].lower() for row in await cur.fetchall()}
+                
+                # Suggest cards that fill gaps
+                for gap in gaps:
+                    category = gap["category"]
+                    for us_card in us_cards:
+                        if us_card["name"].lower() not in existing_card_names:
+                            card_rate = us_card.get("categories", {}).get(category, 0)
+                            if card_rate >= 3.0:  # Good rate for this category
+                                # Estimate annual value (assuming $500/month in category)
+                                monthly_spend = 500
+                                annual_spend = monthly_spend * 12
+                                current_best = gap.get("current_best_rate", 0)
+                                improvement = (card_rate - current_best) / 100 * annual_spend
+                                
+                                recommendations.append({
+                                    "card_name": us_card["name"],
+                                    "bank": us_card["bank"],
+                                    "annual_fee": us_card.get("annual_fee", 0),
+                                    "fills_gap": category,
+                                    "earn_rate": card_rate,
+                                    "estimated_annual_improvement": round(improvement, 2),
+                                    "net_value": round(improvement - us_card.get("annual_fee", 0), 2)
+                                })
+                                break  # One recommendation per gap
+            
+            # Sort recommendations by net value
+            recommendations.sort(key=lambda x: x.get("net_value", 0), reverse=True)
+            
+            return {
+                "gaps": gaps,
+                "overlaps": overlaps,
+                "recommendations": recommendations[:5],  # Top 5 recommendations
+                "summary": f"Found {len(gaps)} gap(s), {len(overlaps)} overlap(s), {len(recommendations)} recommendation(s)"
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Error analyzing wallet gaps: {str(e)}"}
+
 # ============================================================================
 # UI WIDGET RESOURCE
 # ============================================================================
@@ -812,6 +1178,21 @@ def cards_widget():
         return "<html><body><p>Widget file not found</p></body></html>"
     except Exception as e:
         return f"<html><body><p>Error loading widget: {str(e)}</p></body></html>"
+
+@mcp.resource("ui://widget/wallet_summary.html", mime_type="text/html+skybridge")
+def wallet_summary_widget():
+    """
+    HTML widget for wallet summary UI.
+    Shows active cards, best categories per card, and weak spots.
+    """
+    widget_path = Path(__file__).parent / "wallet_summary_widget.html"
+    try:
+        with open(widget_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<html><body><p>Wallet summary widget file not found</p></body></html>"
+    except Exception as e:
+        return f"<html><body><p>Error loading wallet summary widget: {str(e)}</p></body></html>"
 
 # ============================================================================
 # UI MANAGEMENT TOOL
@@ -888,6 +1269,95 @@ async def manage_cards_ui(user_id: int = 1):
                     "text": "Error loading card manager. Please try again."
                 }
             ]
+        }
+
+@mcp.tool()
+async def show_wallet_summary(user_id: int = 1):
+    """
+    Show wallet summary UI widget.
+    Displays active cards, best categories per card, and weak spots (missing coverage).
+    
+    Args:
+        user_id: The user's ID (default: 1 for MVP)
+    
+    Returns:
+        Structured content with wallet analysis and widget reference.
+    """
+    try:
+        # Get active cards
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """
+                SELECT id, name, bank, reward_type, active
+                FROM cards
+                WHERE user_id = ? AND active = 1
+                ORDER BY name ASC
+                """,
+                (user_id,)
+            )
+            cols = [d[0] for d in cur.description]
+            cards = [dict(zip(cols, r)) for r in await cur.fetchall()]
+            
+            # Get reward rules for each card to analyze strengths
+            strengths = []
+            weak_spots = []
+            category_coverage = {}
+            
+            for card in cards:
+                cur = await c.execute(
+                    "SELECT category, earn_rate FROM reward_rules WHERE card_id = ? ORDER BY earn_rate DESC",
+                    (card['id'],)
+                )
+                rules = await cur.fetchall()
+                
+                # Find best categories (rate >= 3%)
+                best_categories = []
+                for category, earn_rate in rules:
+                    if earn_rate >= 3.0:
+                        best_categories.append(f"{category} ({earn_rate}x)")
+                    
+                    # Track category coverage
+                    if category not in category_coverage:
+                        category_coverage[category] = []
+                    category_coverage[category].append(earn_rate)
+                
+                if best_categories:
+                    strengths.append(f"{card['name']}: {', '.join(best_categories)}")
+            
+            # Identify weak spots (important categories with no or low coverage)
+            important_categories = ['groceries', 'dining', 'travel', 'gas']
+            for category in important_categories:
+                if category not in category_coverage:
+                    weak_spots.append(f"No card covers {category}")
+                else:
+                    max_rate = max(category_coverage[category])
+                    if max_rate < 2.0:
+                        weak_spots.append(f"{category}: best rate is only {max_rate}%")
+        
+        return {
+            "structuredContent": {
+                "cards": cards,
+                "strengths": strengths,
+                "weakSpots": weak_spots,
+                "user_id": user_id
+            },
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Wallet summary: {len(cards)} active card(s), {len(strengths)} strength(s), {len(weak_spots)} weak spot(s)"
+                }
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error loading wallet summary: {str(e)}",
+            "structuredContent": {
+                "cards": [],
+                "strengths": [],
+                "weakSpots": [],
+                "user_id": user_id
+            }
         }
 
 # ============================================================================
@@ -1219,10 +1689,11 @@ async def add_available_card(name: str, bank: str, reward_type: str,
 # ============================================================================
 
 def get_openai_client():
-    """Get OpenAI client (API key from environment variable)."""
+    """Get OpenAI client (API key from environment variable or hardcoded for testing)."""
     try:
         from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
+        # Try environment variable first, then fallback to hardcoded (for testing)
+        api_key = os.getenv("OPENAI_API_KEY") or ""
         if not api_key:
             return None
         return OpenAI(api_key=api_key)
@@ -1231,15 +1702,156 @@ def get_openai_client():
     except Exception:
         return None
 
+def load_system_prompt():
+    """Load system prompt from file."""
+    try:
+        prompt_path = Path(__file__).parent / "system_prompt.txt"
+        if prompt_path.exists():
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return None
+    except Exception as e:
+        print(f"Error loading system prompt: {e}")
+        return None
+
 @mcp.tool()
-async def enhanced_chat_response(user_query: str, context: str = ""):
+async def get_system_instructions():
+    """
+    Get the system instructions and behavior rules for this credit card strategist.
+    Call this tool if you need to understand how to use other tools or what the expected behavior is.
+    
+    Returns:
+        Complete system prompt with all rules, flows, and examples.
+    """
+    prompt = load_system_prompt()
+    if prompt:
+        return {
+            "status": "success",
+            "instructions": prompt,
+            "message": "System instructions loaded successfully. Use these rules for all interactions."
+        }
+    else:
+        return {
+            "status": "error",
+            "message": "System prompt file not found"
+        }
+
+@mcp.tool()
+async def suggest_tool_for_query(user_query: str, user_id: int = 1):
+    """
+    Use AI to suggest which tool(s) to call based on user's query.
+    This helps ensure the right tools are called for each user request.
+    
+    Args:
+        user_query: The user's question or request
+        user_id: The user's ID (default: 1)
+    
+    Returns:
+        Suggested tool name(s) and reasoning
+    """
+    try:
+        client = get_openai_client()
+        if not client:
+            return {
+                "status": "error",
+                "message": "OpenAI API not configured"
+            }
+        
+        # Get available tools
+        available_tools = [
+            "create_user", "add_card", "list_cards", "get_reward_rules",
+            "recommend_best_card", "estimate_rewards", "simulate_monthly_spend",
+            "analyze_wallet_gaps", "show_wallet_summary", "manage_cards_ui",
+            "show_deals_ui", "show_recommendations_ui", "lookup_merchant",
+            "get_system_instructions"
+        ]
+        
+        # Get user's current state
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+            user_exists = await cur.fetchone()
+            
+            cur = await c.execute("SELECT COUNT(*) FROM cards WHERE user_id = ?", (user_id,))
+            card_count = (await cur.fetchone())[0]
+        
+        system_prompt = load_system_prompt() or "You are a credit card rewards strategist."
+        
+        prompt = f"""You are a tool selection assistant for a credit card rewards strategist.
+
+System Instructions (key points):
+{system_prompt[:1500]}...
+
+Available Tools:
+{', '.join(available_tools)}
+
+User Query: "{user_query}"
+
+User State:
+- User exists: {bool(user_exists)}
+- Cards count: {card_count}
+
+Task: Analyze the user's query and suggest which tool(s) should be called, in what order.
+
+CRITICAL RULES:
+1. Onboarding flow: If no user exists, suggest create_user first. If no cards exist, suggest manage_cards_ui.
+2. Query intent: What is the user trying to do? (add card, get recommendation, see summary, etc.)
+3. Required data: What tools need to be called to get the data?
+4. Tool sequence: What order should tools be called? (e.g., list_cards before recommend_best_card)
+
+Return ONLY a JSON object with this structure:
+{{
+    "primary_tool": "tool_name",
+    "secondary_tools": ["tool1", "tool2"],
+    "reasoning": "brief explanation of why these tools",
+    "required_params": {{"param": "value or description"}},
+    "onboarding_needed": true/false
+}}
+
+Do not include any explanation outside the JSON."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a tool selection assistant. Always return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.2
+        )
+        
+        ai_response = response.choices[0].message.content.strip()
+        if ai_response.startswith("```"):
+            ai_response = ai_response.split("```")[1]
+            if ai_response.startswith("json"):
+                ai_response = ai_response[4:]
+        ai_response = ai_response.strip()
+        
+        suggestion = json.loads(ai_response)
+        
+        return {
+            "status": "success",
+            "suggestion": suggestion,
+            "user_state": {
+                "user_exists": bool(user_exists),
+                "card_count": card_count
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error suggesting tool: {str(e)}"
+        }
+
+@mcp.tool()
+async def enhanced_chat_response(user_query: str, context: str = "", user_id: int = 1):
     """
     Get enhanced chat response using OpenAI API for complex queries.
-    Uses the user's card data as context.
+    Uses the user's card data as context and follows system prompt rules.
     
     Args:
         user_query: User's question
         context: Optional context about user's cards
+        user_id: The user's ID (default: 1)
     """
     try:
         client = get_openai_client()
@@ -1249,6 +1861,11 @@ async def enhanced_chat_response(user_query: str, context: str = ""):
                 "message": "OpenAI API not configured. Set OPENAI_API_KEY environment variable."
             }
         
+        # Load system prompt
+        system_prompt = load_system_prompt() or """You are an expert credit card rewards strategist. 
+        Your role is to help users optimize their credit card usage and maximize rewards.
+        Always base answers on provided card data context. Use USD ($) for all monetary values."""
+        
         # Build context from user's cards if not provided
         if not context:
             async with aiosqlite.connect(DB_PATH) as c:
@@ -1256,7 +1873,8 @@ async def enhanced_chat_response(user_query: str, context: str = ""):
                     """SELECT c.name, c.bank, c.reward_type, r.category, r.earn_rate
                        FROM cards c
                        LEFT JOIN reward_rules r ON c.id = r.card_id
-                       WHERE c.user_id = 1 AND c.active = 1"""
+                       WHERE c.user_id = ? AND c.active = 1""",
+                    (user_id,)
                 )
                 cards_data = await cur.fetchall()
                 if cards_data:
@@ -1268,22 +1886,13 @@ async def enhanced_chat_response(user_query: str, context: str = ""):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": """You are an expert credit card rewards strategist. Your role is to help users optimize their credit card usage and maximize rewards.
-
-Guidelines:
-- Always base answers on the provided card data context
-- Be specific about reward rates, caps, and limitations
-- Explain trade-offs clearly
-- If information is missing, say so rather than guessing
-- Use Indian Rupees (₹) for all monetary values
-- Be concise but thorough
-- Prioritize actionable advice"""},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"""Context about user's credit cards and reward rules:
 {context}
 
 User Question: {user_query}
 
-Provide a clear, helpful answer based on the context above. If the context doesn't contain enough information to answer fully, acknowledge what you can answer and what's missing."""}
+Provide a clear, helpful answer based on the context above. Follow the system instructions for response format and behavior. If the context doesn't contain enough information to answer fully, acknowledge what you can answer and what's missing."""}
             ],
             max_tokens=500,
             temperature=0.7
@@ -1435,7 +2044,7 @@ async def get_rewards_balance(user_id: int = 1):
             return {
                 "balances": balances,
                 "totals": totals,
-                "summary": f"You have {totals['points']:,.0f} points, {totals['miles']:,.0f} miles, and ₹{totals['cashback']:,.2f} cashback"
+                "summary": f"You have {totals['points']:,.0f} points, {totals['miles']:,.0f} miles, and ${totals['cashback']:,.2f} cashback"
             }
     except Exception as e:
         return {"status": "error", "message": f"Error getting rewards balance: {str(e)}"}
@@ -1673,7 +2282,7 @@ async def show_card_comparison(user_id: int, spend_amount: float, category: str)
             "content": [
                 {
                     "type": "text",
-                    "text": f"Comparing top {len(top_cards)} cards for ₹{spend_amount:,.0f} {category} spend"
+                    "text": f"Comparing top {len(top_cards)} cards for ${spend_amount:,.0f} {category} spend"
                 }
             ]
         }
@@ -1683,6 +2292,13 @@ async def show_card_comparison(user_id: int, spend_amount: float, category: str)
             "message": f"Error showing comparison: {str(e)}",
             "structuredContent": {"comparison": [], "spend_amount": spend_amount, "category": category}
         }
+
+# Load system prompt at startup and make it available
+SYSTEM_PROMPT = load_system_prompt()
+if SYSTEM_PROMPT:
+    print("System prompt loaded successfully")
+else:
+    print("Warning: System prompt not found")
 
 # Start the server
 if __name__ == "__main__":

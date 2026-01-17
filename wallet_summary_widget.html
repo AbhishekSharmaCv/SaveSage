@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Summary</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: transparent;
+            padding: 16px;
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 24px;
+        }
+        
+        .section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        
+        .card-item {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .card-item:hover {
+            border-color: #667eea;
+        }
+        
+        .card-name {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #333;
+        }
+        
+        .card-bank {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .card-categories {
+            font-size: 12px;
+            color: #555;
+        }
+        
+        .category-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin: 2px 4px 2px 0;
+        }
+        
+        .category-tag.high {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .weak-spots {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        
+        .weak-spots-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        
+        .weak-spot-item {
+            font-size: 13px;
+            color: #856404;
+            margin-bottom: 4px;
+        }
+        
+        .strengths {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        
+        .strengths-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #155724;
+            margin-bottom: 8px;
+        }
+        
+        .strength-item {
+            font-size: 13px;
+            color: #155724;
+            margin-bottom: 4px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💼 Wallet Summary</h1>
+            <p>Your credit card portfolio overview</p>
+        </div>
+        
+        <div class="content">
+            <!-- Active Cards -->
+            <div class="section">
+                <h2 class="section-title">Active Cards</h2>
+                <div id="cards-container">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Loading wallet...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Strengths -->
+            <div class="section">
+                <h2 class="section-title">💪 Strengths</h2>
+                <div id="strengths-container">
+                    <div class="loading">Analyzing...</div>
+                </div>
+            </div>
+            
+            <!-- Weak Spots -->
+            <div class="section">
+                <h2 class="section-title">⚠️ Weak Spots</h2>
+                <div id="weak-spots-container">
+                    <div class="loading">Analyzing...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+            
+            // State
+            let walletData = {
+                cards: [],
+                strengths: [],
+                weakSpots: []
+            };
+            let userId = 1;
+            
+            // Initialize
+            function init() {
+                // Read initial data from tool output
+                if (window.openai && window.openai.toolOutput) {
+                    try {
+                        const output = window.openai.toolOutput;
+                        if (output.structuredContent) {
+                            if (output.structuredContent.cards) {
+                                walletData.cards = output.structuredContent.cards || [];
+                            }
+                            if (output.structuredContent.strengths) {
+                                walletData.strengths = output.structuredContent.strengths || [];
+                            }
+                            if (output.structuredContent.weakSpots) {
+                                walletData.weakSpots = output.structuredContent.weakSpots || [];
+                            }
+                            if (output.structuredContent.user_id) {
+                                userId = output.structuredContent.user_id;
+                            }
+                        }
+                        
+                        if (walletData.cards.length > 0) {
+                            renderWallet();
+                        } else {
+                            loadWallet();
+                        }
+                    } catch (e) {
+                        console.error('Error reading tool output:', e);
+                        loadWallet();
+                    }
+                } else {
+                    loadWallet();
+                }
+                
+                // Listen for tool output changes
+                if (window.openai && window.openai.onToolOutput) {
+                    window.openai.onToolOutput(function(newOutput) {
+                        try {
+                            if (newOutput && newOutput.structuredContent) {
+                                if (newOutput.structuredContent.cards) {
+                                    walletData.cards = newOutput.structuredContent.cards || [];
+                                }
+                                if (newOutput.structuredContent.strengths) {
+                                    walletData.strengths = newOutput.structuredContent.strengths || [];
+                                }
+                                if (newOutput.structuredContent.weakSpots) {
+                                    walletData.weakSpots = newOutput.structuredContent.weakSpots || [];
+                                }
+                                renderWallet();
+                            }
+                        } catch (e) {
+                            console.error('Error handling tool output update:', e);
+                        }
+                    });
+                }
+            }
+            
+            // Load wallet data
+            async function loadWallet() {
+                try {
+                    if (window.openai && window.openai.callTool) {
+                        // Get cards
+                        const cardsResult = await window.openai.callTool('list_cards', { user_id: userId });
+                        if (cardsResult && Array.isArray(cardsResult)) {
+                            walletData.cards = cardsResult.filter(c => c.active);
+                            
+                            // Get reward rules for each card to determine strengths/weaknesses
+                            const cardsWithRules = [];
+                            for (const card of walletData.cards) {
+                                const rulesResult = await window.openai.callTool('get_reward_rules', { card_id: card.id });
+                                if (rulesResult && rulesResult.rules) {
+                                    cardsWithRules.push({
+                                        ...card,
+                                        rules: rulesResult.rules
+                                    });
+                                }
+                            }
+                            
+                            // Analyze strengths and weak spots
+                            analyzeWallet(cardsWithRules);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading wallet:', error);
+                } finally {
+                    renderWallet();
+                }
+            }
+            
+            // Analyze wallet for strengths and weak spots
+            function analyzeWallet(cardsWithRules) {
+                const categoryRates = {};
+                const cardStrengths = {};
+                
+                // Collect all category rates
+                for (const card of cardsWithRules) {
+                    cardStrengths[card.id] = {
+                        name: card.name,
+                        bestCategories: []
+                    };
+                    
+                    for (const rule of card.rules || []) {
+                        const category = rule.category;
+                        const rate = rule.earn_rate;
+                        
+                        if (!categoryRates[category]) {
+                            categoryRates[category] = [];
+                        }
+                        categoryRates[category].push({ card: card.name, rate: rate });
+                        
+                        // Track best categories per card (rate >= 3%)
+                        if (rate >= 3.0) {
+                            cardStrengths[card.id].bestCategories.push({
+                                category: category,
+                                rate: rate
+                            });
+                        }
+                    }
+                }
+                
+                // Build strengths list
+                walletData.strengths = [];
+                for (const cardId in cardStrengths) {
+                    const card = cardStrengths[cardId];
+                    if (card.bestCategories.length > 0) {
+                        const categoriesStr = card.bestCategories
+                            .map(c => `${c.category} (${c.rate}x)`)
+                            .join(', ');
+                        walletData.strengths.push(`${card.name}: ${categoriesStr}`);
+                    }
+                }
+                
+                // Build weak spots (categories with no good coverage)
+                walletData.weakSpots = [];
+                const importantCategories = ['groceries', 'dining', 'travel', 'gas'];
+                for (const category of importantCategories) {
+                    const rates = categoryRates[category] || [];
+                    if (rates.length === 0) {
+                        walletData.weakSpots.push(`No card covers ${category}`);
+                    } else {
+                        const maxRate = Math.max(...rates.map(r => r.rate));
+                        if (maxRate < 2.0) {
+                            walletData.weakSpots.push(`${category}: best rate is only ${maxRate}%`);
+                        }
+                    }
+                }
+            }
+            
+            // Render wallet
+            function renderWallet() {
+                renderCards();
+                renderStrengths();
+                renderWeakSpots();
+            }
+            
+            // Render cards
+            function renderCards() {
+                const container = document.getElementById('cards-container');
+                if (!container) return;
+                
+                if (walletData.cards.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💳</div>
+                            <div>No active cards</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="card-grid">
+                        ${walletData.cards.map(card => `
+                            <div class="card-item">
+                                <div class="card-name">${escapeHtml(card.name || 'Unknown')}</div>
+                                <div class="card-bank">${escapeHtml(card.bank || 'Unknown')} • ${capitalize(card.reward_type || 'unknown')}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            // Render strengths
+            function renderStrengths() {
+                const container = document.getElementById('strengths-container');
+                if (!container) return;
+                
+                if (walletData.strengths.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No strong categories identified</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="strengths">
+                        <div class="strengths-title">Your Best Categories</div>
+                        ${walletData.strengths.map(strength => `
+                            <div class="strength-item">• ${escapeHtml(strength)}</div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            // Render weak spots
+            function renderWeakSpots() {
+                const container = document.getElementById('weak-spots-container');
+                if (!container) return;
+                
+                if (walletData.weakSpots.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No weak spots found - great coverage!</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="weak-spots">
+                        <div class="weak-spots-title">Areas for Improvement</div>
+                        ${walletData.weakSpots.map(spot => `
+                            <div class="weak-spot-item">• ${escapeHtml(spot)}</div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            // Utility functions
+            function escapeHtml(text) {
+                if (text == null) return '';
+                const div = document.createElement('div');
+                div.textContent = String(text);
+                return div.innerHTML;
+            }
+            
+            function capitalize(str) {
+                if (!str) return '';
+                return String(str).charAt(0).toUpperCase() + String(str).slice(1);
+            }
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+    </script>
+</body>
+</html>

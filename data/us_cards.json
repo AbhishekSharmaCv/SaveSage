@@ -1,0 +1,332 @@
+[
+  {
+    "name": "Chase Sapphire Preferred",
+    "bank": "Chase",
+    "annual_fee": 95,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 5,
+      "groceries": 1,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 60000,
+      "spend": 4000,
+      "days": 90
+    },
+    "point_value": 0.0125,
+    "transfer_partners": ["United", "Hyatt", "British Airways", "Singapore Airlines", "JetBlue", "Southwest"],
+    "approximate": true,
+    "notes": "Signup bonus varies (often 60k-80k). Point value is 1.25cpp when transferred to partners."
+  },
+  {
+    "name": "Chase Sapphire Reserve",
+    "bank": "Chase",
+    "annual_fee": 550,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 5,
+      "groceries": 1,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 60000,
+      "spend": 4000,
+      "days": 90
+    },
+    "point_value": 0.015,
+    "transfer_partners": ["United", "Hyatt", "British Airways", "Singapore Airlines", "JetBlue", "Southwest"],
+    "approximate": false
+  },
+  {
+    "name": "Chase Freedom Flex",
+    "bank": "Chase",
+    "annual_fee": 0,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 5,
+      "groceries": 5,
+      "gas": 5,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 20000,
+      "spend": 500,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "5% rotating categories (quarterly), 3% dining/drugstores, 1% everything else"
+  },
+  {
+    "name": "Chase Freedom Unlimited",
+    "bank": "Chase",
+    "annual_fee": 0,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 1,
+      "groceries": 1.5,
+      "gas": 1.5,
+      "general": 1.5
+    },
+    "signup_bonus": {
+      "amount": 20000,
+      "spend": 500,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "1.5% on all purchases, 3% dining/drugstores, 5% travel via Chase Ultimate Rewards"
+  },
+  {
+    "name": "Amex Gold",
+    "bank": "American Express",
+    "annual_fee": 325,
+    "reward_type": "points",
+    "categories": {
+      "dining": 4,
+      "travel": 3,
+      "groceries": 4,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 90000,
+      "spend": 6000,
+      "days": 180
+    },
+    "point_value": 0.0125,
+    "transfer_partners": ["Delta", "Air France-KLM", "Emirates", "Hilton", "Marriott"],
+    "approximate": true,
+    "notes": "4x on dining and US supermarkets (up to $25k/year), 3x flights, 1x everything else. Signup bonus varies (often 60k-90k)."
+  },
+  {
+    "name": "Amex Platinum",
+    "bank": "American Express",
+    "annual_fee": 695,
+    "reward_type": "points",
+    "categories": {
+      "dining": 1,
+      "travel": 5,
+      "groceries": 1,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 150000,
+      "spend": 8000,
+      "days": 180
+    },
+    "point_value": 0.0125,
+    "transfer_partners": ["Delta", "Air France-KLM", "Emirates", "Hilton", "Marriott", "British Airways"],
+    "approximate": true,
+    "notes": "5x flights (direct or Amex Travel), 5x hotels (Amex Travel), 1x everything else. Premium travel benefits. Signup bonus varies (often 80k-150k)."
+  },
+  {
+    "name": "Blue Cash Preferred",
+    "bank": "American Express",
+    "annual_fee": 95,
+    "reward_type": "cashback",
+    "categories": {
+      "dining": 1,
+      "travel": 1,
+      "groceries": 6,
+      "gas": 3,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 250,
+      "spend": 3000,
+      "days": 180
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "6% US supermarkets (up to $6k/year), 6% streaming, 3% transit/gas, 1% everything else"
+  },
+  {
+    "name": "Blue Cash Everyday",
+    "bank": "American Express",
+    "annual_fee": 0,
+    "reward_type": "cashback",
+    "categories": {
+      "dining": 1,
+      "travel": 1,
+      "groceries": 3,
+      "gas": 3,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 200,
+      "spend": 2000,
+      "days": 180
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "3% US supermarkets (up to $6k/year), 3% gas, 3% online retail, 1% everything else"
+  },
+  {
+    "name": "Capital One Venture X",
+    "bank": "Capital One",
+    "annual_fee": 395,
+    "reward_type": "miles",
+    "categories": {
+      "dining": 2,
+      "travel": 10,
+      "groceries": 2,
+      "gas": 2,
+      "general": 2
+    },
+    "signup_bonus": {
+      "amount": 75000,
+      "spend": 4000,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": ["Air Canada Aeroplan", "Avianca LifeMiles", "Emirates Skywards", "Qantas", "Marriott Bonvoy"],
+    "approximate": false,
+    "notes": "10x hotels/rental cars (Capital One Travel), 5x flights (Capital One Travel), 2x everything else"
+  },
+  {
+    "name": "Capital One Venture",
+    "bank": "Capital One",
+    "annual_fee": 95,
+    "reward_type": "miles",
+    "categories": {
+      "dining": 2,
+      "travel": 5,
+      "groceries": 2,
+      "gas": 2,
+      "general": 2
+    },
+    "signup_bonus": {
+      "amount": 75000,
+      "spend": 4000,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": ["Air Canada Aeroplan", "Avianca LifeMiles", "Emirates Skywards", "Qantas", "Marriott Bonvoy"],
+    "approximate": false,
+    "notes": "5x hotels/rental cars (Capital One Travel), 2x everything else"
+  },
+  {
+    "name": "Capital One SavorOne",
+    "bank": "Capital One",
+    "annual_fee": 0,
+    "reward_type": "cashback",
+    "categories": {
+      "dining": 3,
+      "travel": 1,
+      "groceries": 3,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 200,
+      "spend": 500,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "3% dining, 3% entertainment, 3% groceries, 3% streaming, 1% everything else"
+  },
+  {
+    "name": "Citi Double Cash",
+    "bank": "Citi",
+    "annual_fee": 0,
+    "reward_type": "cashback",
+    "categories": {
+      "dining": 2,
+      "travel": 2,
+      "groceries": 2,
+      "gas": 2,
+      "general": 2
+    },
+    "signup_bonus": {
+      "amount": 200,
+      "spend": 1500,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "2% on all purchases (1% when you buy, 1% when you pay)"
+  },
+  {
+    "name": "Citi Custom Cash",
+    "bank": "Citi",
+    "annual_fee": 0,
+    "reward_type": "cashback",
+    "categories": {
+      "dining": 5,
+      "travel": 5,
+      "groceries": 5,
+      "gas": 5,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 200,
+      "spend": 1500,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": [],
+    "approximate": false,
+    "notes": "5% on top eligible category (up to $500/month), 1% everything else"
+  },
+  {
+    "name": "Citi Premier",
+    "bank": "Citi",
+    "annual_fee": 95,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 3,
+      "groceries": 3,
+      "gas": 3,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 60000,
+      "spend": 4000,
+      "days": 90
+    },
+    "point_value": 0.01,
+    "transfer_partners": ["American Airlines", "JetBlue", "Choice Hotels", "Wyndham"],
+    "approximate": false,
+    "notes": "3x restaurants, supermarkets, gas stations, air travel, hotels, 1x everything else"
+  },
+  {
+    "name": "Bilt Mastercard",
+    "bank": "Bilt",
+    "annual_fee": 0,
+    "reward_type": "points",
+    "categories": {
+      "dining": 3,
+      "travel": 2,
+      "groceries": 1,
+      "gas": 1,
+      "general": 1
+    },
+    "signup_bonus": {
+      "amount": 0,
+      "spend": 0,
+      "days": 0
+    },
+    "point_value": 0.0125,
+    "transfer_partners": ["American Airlines", "United", "Hyatt", "Marriott", "Air France-KLM"],
+    "approximate": false,
+    "notes": "1x on rent (up to 50k points/year), 3x dining, 2x travel, 1x everything else. No annual fee"
+  }
+  
+]
