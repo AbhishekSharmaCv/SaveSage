@@ -75,11 +75,10 @@ The `enhanced_chat_response()` tool now:
 
 ## OpenAI API Key
 
-The API key is configured in two ways:
-1. **Environment Variable** (preferred): `OPENAI_API_KEY`
-2. **Hardcoded Fallback** (for testing): Set in `get_openai_client()`
+The API key is configured via environment variable only:
+1. **Environment Variable**: `OPENAI_API_KEY`
 
-**Note**: For production, use environment variables only. Remove hardcoded keys.
+**Note**: Never hardcode API keys in the code. Always use environment variables for security.
 
 ## Usage Examples
 
