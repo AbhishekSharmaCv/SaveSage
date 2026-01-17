@@ -1565,6 +1565,30 @@ async def recommend_new_cards(user_id: int = 1, preference: str = None):
             if not candidate_cards:
                 return []
             
+            # Load US cards data for better recommendations
+            us_cards_path = Path(__file__).parent / "data" / "us_cards.json"
+            us_cards_available = []
+            if us_cards_path.exists():
+                with open(us_cards_path, "r", encoding="utf-8") as f:
+                    us_cards_data = json.load(f)
+                    # Map US cards to available_cards format
+                    for us_card in us_cards_data:
+                        if (us_card["name"], us_card["bank"]) not in existing_cards:
+                            us_cards_available.append({
+                                "name": us_card["name"],
+                                "bank": us_card["bank"],
+                                "reward_type": us_card["reward_type"],
+                                "annual_fee": us_card.get("annual_fee", 0),
+                                "key_benefits": us_card.get("notes", ""),
+                                "target_audience": "travel" if us_card.get("categories", {}).get("travel", 0) >= 3 else "balanced",
+                                "categories": us_card.get("categories", {}),
+                                "signup_bonus": us_card.get("signup_bonus", {}),
+                                "from_us_cards": True
+                            })
+            
+            # Combine available_cards and us_cards
+            all_candidate_cards = candidate_cards + us_cards_available
+            
             # Use AI to intelligently rank and recommend cards
             client = get_openai_client()
             if client:
@@ -1587,7 +1611,7 @@ User Profile:
 - Existing Cards: {json.dumps(existing_context, indent=2)}
 
 Candidate Cards:
-{json.dumps(candidate_cards, indent=2)}
+{json.dumps(all_candidate_cards[:20], indent=2, default=str)}
 
 Task: Rank and select the top 5 cards that would best complement the user's existing portfolio. Consider:
 1. Gaps in reward categories (e.g., if user has no travel card, recommend one)
@@ -1596,7 +1620,7 @@ Task: Rank and select the top 5 cards that would best complement the user's exis
 4. User's stated preference ({user_pref})
 5. Benefits that user doesn't currently have
 
-Return ONLY a JSON array of card IDs (as integers) in order of recommendation, e.g., [3, 1, 5, 2, 4]
+Return ONLY a JSON array of card names in order of recommendation, e.g., ["Chase Sapphire Reserve", "Amex Platinum", "Capital One Venture X"]
 Do not include any explanation, only the JSON array."""
 
                     response = client.chat.completions.create(
@@ -1611,21 +1635,25 @@ Do not include any explanation, only the JSON array."""
                     
                     # Parse AI response
                     ai_response = response.choices[0].message.content.strip()
-                    # Remove markdown code blocks if present
                     if ai_response.startswith("```"):
                         ai_response = ai_response.split("```")[1]
                         if ai_response.startswith("json"):
                             ai_response = ai_response[4:]
                     ai_response = ai_response.strip()
                     
-                    recommended_ids = json.loads(ai_response)
+                    recommended_names = json.loads(ai_response)
                     
-                    # Map IDs back to cards and maintain order
-                    card_map = {card['id']: card for card in candidate_cards}
-                    recommendations = [card_map[id] for id in recommended_ids if id in card_map]
+                    # Map names back to cards
+                    recommendations = []
+                    for name in recommended_names:
+                        for card in all_candidate_cards:
+                            if card.get('name', '') == name or name in card.get('name', ''):
+                                if card not in recommendations:
+                                    recommendations.append(card)
+                                    break
                     
                     # Fill remaining slots if AI didn't recommend 5
-                    remaining = [c for c in candidate_cards if c['id'] not in recommended_ids]
+                    remaining = [c for c in all_candidate_cards if c not in recommendations]
                     recommendations.extend(remaining[:5 - len(recommendations)])
                     
                     return recommendations[:5]
@@ -1633,19 +1661,111 @@ Do not include any explanation, only the JSON array."""
                     # Fallback to rule-based if AI fails
                     print(f"AI recommendation failed, using fallback: {e}")
             
-            # Fallback: Rule-based matching
+            # Fallback: Rule-based matching with US cards data
             recommendations = []
-            for card in candidate_cards:
-                if user_pref == 'travel' and 'travel' in (card.get('target_audience') or '').lower():
-                    recommendations.append(card)
-                elif user_pref == 'cashback' and card['reward_type'] == 'cashback':
-                    recommendations.append(card)
-                elif user_pref == 'balanced':
-                    recommendations.append(card)
+            
+            # For travel preference, prioritize travel cards
+            if user_pref == 'travel':
+                # Sort by travel category rate
+                travel_cards = [c for c in all_candidate_cards if c.get('categories', {}).get('travel', 0) >= 3]
+                travel_cards.sort(key=lambda x: x.get('categories', {}).get('travel', 0), reverse=True)
+                recommendations.extend(travel_cards[:3])
+                
+                # Add premium travel cards
+                premium_travel = [c for c in all_candidate_cards if 'Sapphire Reserve' in c.get('name', '') or 'Platinum' in c.get('name', '') or 'Venture X' in c.get('name', '')]
+                for card in premium_travel:
+                    if card not in recommendations:
+                        recommendations.append(card)
+            elif user_pref == 'cashback':
+                cashback_cards = [c for c in all_candidate_cards if c.get('reward_type') == 'cashback']
+                recommendations.extend(cashback_cards[:5])
+            else:
+                # Balanced: mix of categories
+                # Get best cards for different categories
+                best_travel = max([c for c in all_candidate_cards if c.get('categories', {}).get('travel', 0) > 0], 
+                                 key=lambda x: x.get('categories', {}).get('travel', 0), default=None)
+                best_dining = max([c for c in all_candidate_cards if c.get('categories', {}).get('dining', 0) > 0],
+                                 key=lambda x: x.get('categories', {}).get('dining', 0), default=None)
+                best_groceries = max([c for c in all_candidate_cards if c.get('categories', {}).get('groceries', 0) > 0],
+                                    key=lambda x: x.get('categories', {}).get('groceries', 0), default=None)
+                
+                for card in [best_travel, best_dining, best_groceries]:
+                    if card and card not in recommendations:
+                        recommendations.append(card)
+            
+            # Fill remaining slots
+            remaining = [c for c in all_candidate_cards if c not in recommendations]
+                    recommendations.extend(remaining[:5 - len(recommendations)])
             
             return recommendations[:5]
     except Exception as e:
         return {"status": "error", "message": f"Error getting recommendations: {str(e)}"}
+
+@mcp.tool()
+async def recommend_travel_cards(user_id: int = 1, international: bool = True):
+    """
+    Recommend the best travel credit cards, especially for international flights from the US.
+    Works without OpenAI API - uses US card data directly.
+    
+    Args:
+        user_id: The user's ID
+        international: Whether user travels internationally (default: True)
+    
+    Returns:
+        List of recommended travel cards with details
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            # Get user's existing cards
+            cur = await c.execute(
+                "SELECT name, bank FROM cards WHERE user_id = ?",
+                (user_id,)
+            )
+            existing_cards = {(row[0], row[1]) for row in await cur.fetchall()}
+        
+        # Load US cards data
+        us_cards_path = Path(__file__).parent / "data" / "us_cards.json"
+        if not us_cards_path.exists():
+            return {"status": "error", "message": "US cards data not found"}
+        
+        with open(us_cards_path, "r", encoding="utf-8") as f:
+            us_cards = json.load(f)
+        
+        # Filter travel cards (travel category >= 3)
+        travel_cards = []
+        for card in us_cards:
+            if (card["name"], card["bank"]) not in existing_cards:
+                travel_rate = card.get("categories", {}).get("travel", 0)
+                if travel_rate >= 3:
+                    travel_cards.append({
+                        "name": card["name"],
+                        "bank": card["bank"],
+                        "reward_type": card["reward_type"],
+                        "annual_fee": card.get("annual_fee", 0),
+                        "travel_rate": travel_rate,
+                        "point_value": card.get("point_value", 0.01),
+                        "signup_bonus": card.get("signup_bonus", {}),
+                        "transfer_partners": card.get("transfer_partners", []),
+                        "notes": card.get("notes", ""),
+                        "categories": card.get("categories", {})
+                    })
+        
+        # Sort by travel rate and point value
+        travel_cards.sort(key=lambda x: (x["travel_rate"], x["point_value"]), reverse=True)
+        
+        # For international travel, prioritize cards with good transfer partners
+        if international:
+            premium_travel = [c for c in travel_cards if len(c.get("transfer_partners", [])) > 3]
+            other_travel = [c for c in travel_cards if len(c.get("transfer_partners", [])) <= 3]
+            travel_cards = premium_travel + other_travel
+        
+        return {
+            "status": "success",
+            "recommendations": travel_cards[:5],
+            "message": f"Found {len(travel_cards)} travel cards. Top recommendations for international travel from the US."
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error getting travel recommendations: {str(e)}"}
 
 @mcp.tool()
 async def add_available_card(name: str, bank: str, reward_type: str,
@@ -1750,22 +1870,6 @@ async def suggest_tool_for_query(user_query: str, user_id: int = 1):
         Suggested tool name(s) and reasoning
     """
     try:
-        client = get_openai_client()
-        if not client:
-            return {
-                "status": "error",
-                "message": "OpenAI API not configured"
-            }
-        
-        # Get available tools
-        available_tools = [
-            "create_user", "add_card", "list_cards", "get_reward_rules",
-            "recommend_best_card", "estimate_rewards", "simulate_monthly_spend",
-            "analyze_wallet_gaps", "show_wallet_summary", "manage_cards_ui",
-            "show_deals_ui", "show_recommendations_ui", "lookup_merchant",
-            "get_system_instructions"
-        ]
-        
         # Get user's current state
         async with aiosqlite.connect(DB_PATH) as c:
             cur = await c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
@@ -1774,59 +1878,160 @@ async def suggest_tool_for_query(user_query: str, user_id: int = 1):
             cur = await c.execute("SELECT COUNT(*) FROM cards WHERE user_id = ?", (user_id,))
             card_count = (await cur.fetchone())[0]
         
-        system_prompt = load_system_prompt() or "You are a credit card rewards strategist."
+        # Rule-based tool selection (works without API)
+        query_lower = user_query.lower()
         
-        prompt = f"""You are a tool selection assistant for a credit card rewards strategist.
-
-System Instructions (key points):
-{system_prompt[:1500]}...
-
-Available Tools:
-{', '.join(available_tools)}
+        # Onboarding queries
+        if not user_exists:
+            suggestion = {
+                "primary_tool": "create_user",
+                "secondary_tools": [],
+                "reasoning": "User does not exist, need to create user first",
+                "required_params": {"preference": "balanced"},
+                "onboarding_needed": True
+            }
+        elif card_count == 0:
+            if any(word in query_lower for word in ["add", "card", "wallet", "have"]):
+                suggestion = {
+                    "primary_tool": "manage_cards_ui",
+                    "secondary_tools": [],
+                    "reasoning": "User has no cards, need to add cards first",
+                    "required_params": {"user_id": user_id},
+                    "onboarding_needed": True
+                }
+            else:
+                suggestion = {
+                    "primary_tool": "manage_cards_ui",
+                    "secondary_tools": [],
+                    "reasoning": "User has no cards, guide to add cards",
+                    "required_params": {"user_id": user_id},
+                    "onboarding_needed": True
+                }
+        # Travel/recommendation queries
+        elif any(word in query_lower for word in ["travel", "flight", "international", "airline", "recommend", "suggest", "which card", "what card", "best card"]):
+            # For travel-specific queries, use recommend_travel_cards (works without API)
+            if any(word in query_lower for word in ["travel", "flight", "international", "airline"]):
+                suggestion = {
+                    "primary_tool": "recommend_travel_cards",
+                    "secondary_tools": ["recommend_new_cards", "show_recommendations_ui"],
+                    "reasoning": "User asking for travel card recommendations - use recommend_travel_cards first (works without API)",
+                    "required_params": {"user_id": user_id, "international": "international" in query_lower or "flight" in query_lower},
+                    "onboarding_needed": False
+                }
+            elif "recommend" in query_lower or "suggest" in query_lower or "best" in query_lower:
+                suggestion = {
+                    "primary_tool": "recommend_new_cards",
+                    "secondary_tools": ["show_recommendations_ui"],
+                    "reasoning": "User asking for card recommendations",
+                    "required_params": {"user_id": user_id, "preference": "travel" if "travel" in query_lower else None},
+                    "onboarding_needed": False
+                }
+            else:
+                suggestion = {
+                    "primary_tool": "recommend_best_card",
+                    "secondary_tools": ["list_cards"],
+                    "reasoning": "User asking which card to use",
+                    "required_params": {"user_id": user_id, "category": "travel" if "travel" in query_lower else "general", "spend_amount": 0},
+                    "onboarding_needed": False
+                }
+        # Card management queries
+        elif any(word in query_lower for word in ["add card", "my cards", "show cards", "list cards"]):
+            suggestion = {
+                "primary_tool": "manage_cards_ui",
+                "secondary_tools": ["list_cards"],
+                "reasoning": "User wants to manage or view their cards",
+                "required_params": {"user_id": user_id},
+                "onboarding_needed": False
+            }
+        # Wallet summary queries
+        elif any(word in query_lower for word in ["wallet", "summary", "overview", "portfolio"]):
+            suggestion = {
+                "primary_tool": "show_wallet_summary",
+                "secondary_tools": ["list_cards"],
+                "reasoning": "User wants to see wallet summary",
+                "required_params": {"user_id": user_id},
+                "onboarding_needed": False
+            }
+        # Deals queries
+        elif any(word in query_lower for word in ["deal", "offer", "promotion"]):
+            suggestion = {
+                "primary_tool": "show_deals_ui",
+                "secondary_tools": ["get_deals"],
+                "reasoning": "User asking about deals or offers",
+                "required_params": {"user_id": user_id},
+                "onboarding_needed": False
+            }
+        # General queries - use enhanced_chat_response if API available, otherwise recommend_new_cards
+        else:
+        client = get_openai_client()
+            if client:
+                suggestion = {
+                    "primary_tool": "enhanced_chat_response",
+                    "secondary_tools": ["list_cards"],
+                    "reasoning": "General query, use enhanced chat response",
+                    "required_params": {"user_id": user_id, "user_query": user_query},
+                    "onboarding_needed": False
+                }
+            else:
+                # Fallback: suggest recommendations
+                suggestion = {
+                    "primary_tool": "recommend_new_cards",
+                    "secondary_tools": ["show_recommendations_ui"],
+                    "reasoning": "General query, show card recommendations as fallback",
+                    "required_params": {"user_id": user_id},
+                    "onboarding_needed": False
+                }
+        
+        # Try AI enhancement if available
+        client = get_openai_client()
+        if client:
+            try:
+                available_tools = [
+                    "create_user", "add_card", "list_cards", "get_reward_rules",
+                    "recommend_best_card", "estimate_rewards", "simulate_monthly_spend",
+                    "analyze_wallet_gaps", "show_wallet_summary", "manage_cards_ui",
+                    "show_deals_ui", "show_recommendations_ui", "recommend_new_cards",
+                    "recommend_travel_cards", "lookup_merchant", "get_system_instructions", 
+                    "enhanced_chat_response"
+                ]
+                
+                system_prompt = load_system_prompt() or "You are a credit card rewards strategist."
+                
+                prompt = f"""You are a tool selection assistant. The rule-based system suggested:
+{json.dumps(suggestion, indent=2)}
 
 User Query: "{user_query}"
+User State: exists={bool(user_exists)}, cards={card_count}
 
-User State:
-- User exists: {bool(user_exists)}
-- Cards count: {card_count}
+Available Tools: {', '.join(available_tools)}
 
-Task: Analyze the user's query and suggest which tool(s) should be called, in what order.
+Refine the suggestion if needed, or confirm the rule-based suggestion is correct.
+Return ONLY a JSON object with the same structure as above."""
 
-CRITICAL RULES:
-1. Onboarding flow: If no user exists, suggest create_user first. If no cards exist, suggest manage_cards_ui.
-2. Query intent: What is the user trying to do? (add card, get recommendation, see summary, etc.)
-3. Required data: What tools need to be called to get the data?
-4. Tool sequence: What order should tools be called? (e.g., list_cards before recommend_best_card)
-
-Return ONLY a JSON object with this structure:
-{{
-    "primary_tool": "tool_name",
-    "secondary_tools": ["tool1", "tool2"],
-    "reasoning": "brief explanation of why these tools",
-    "required_params": {{"param": "value or description"}},
-    "onboarding_needed": true/false
-}}
-
-Do not include any explanation outside the JSON."""
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a tool selection assistant. Always return only valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=400,
-            temperature=0.2
-        )
-        
-        ai_response = response.choices[0].message.content.strip()
-        if ai_response.startswith("```"):
-            ai_response = ai_response.split("```")[1]
-            if ai_response.startswith("json"):
-                ai_response = ai_response[4:]
-        ai_response = ai_response.strip()
-        
-        suggestion = json.loads(ai_response)
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a tool selection assistant. Always return only valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=300,
+                    temperature=0.2
+                )
+                
+                ai_response = response.choices[0].message.content.strip()
+                if ai_response.startswith("```"):
+                    ai_response = ai_response.split("```")[1]
+                    if ai_response.startswith("json"):
+                        ai_response = ai_response[4:]
+                ai_response = ai_response.strip()
+                
+                ai_suggestion = json.loads(ai_response)
+                # Use AI suggestion if it's better
+                if ai_suggestion.get("primary_tool"):
+                    suggestion = ai_suggestion
+            except Exception as e:
+                # Use rule-based suggestion if AI fails
+                print(f"AI tool suggestion failed, using rule-based: {e}")
         
         return {
             "status": "success",
@@ -1837,8 +2042,8 @@ Do not include any explanation outside the JSON."""
             }
         }
     except Exception as e:
-        return {
-            "status": "error",
+            return {
+                "status": "error",
             "message": f"Error suggesting tool: {str(e)}"
         }
 
@@ -1847,6 +2052,7 @@ async def enhanced_chat_response(user_query: str, context: str = "", user_id: in
     """
     Get enhanced chat response using OpenAI API for complex queries.
     Uses the user's card data as context and follows system prompt rules.
+    Falls back to rule-based responses if OpenAI API is not configured.
     
     Args:
         user_query: User's question
@@ -1854,18 +2060,6 @@ async def enhanced_chat_response(user_query: str, context: str = "", user_id: in
         user_id: The user's ID (default: 1)
     """
     try:
-        client = get_openai_client()
-        if not client:
-            return {
-                "status": "error",
-                "message": "OpenAI API not configured. Set OPENAI_API_KEY environment variable."
-            }
-        
-        # Load system prompt
-        system_prompt = load_system_prompt() or """You are an expert credit card rewards strategist. 
-        Your role is to help users optimize their credit card usage and maximize rewards.
-        Always base answers on provided card data context. Use USD ($) for all monetary values."""
-        
         # Build context from user's cards if not provided
         if not context:
             async with aiosqlite.connect(DB_PATH) as c:
@@ -1882,6 +2076,84 @@ async def enhanced_chat_response(user_query: str, context: str = "", user_id: in
                         "name": row[0], "bank": row[1], "reward_type": row[2],
                         "category": row[3], "earn_rate": row[4]
                     } for row in cards_data], indent=2)
+        
+        client = get_openai_client()
+        if not client:
+            # Fallback: Provide rule-based response without API
+            query_lower = user_query.lower()
+            
+            # Travel-related queries
+            if any(word in query_lower for word in ["travel", "flight", "international", "airline", "hotel"]):
+                async with aiosqlite.connect(DB_PATH) as c:
+                    cur = await c.execute(
+                        """SELECT c.name, c.bank, r.category, r.earn_rate
+                           FROM cards c
+                           LEFT JOIN reward_rules r ON c.id = r.card_id
+                           WHERE c.user_id = ? AND c.active = 1 AND r.category = 'travel'
+                           ORDER BY r.earn_rate DESC""",
+                        (user_id,)
+                    )
+                    travel_cards = await cur.fetchall()
+                    
+                    if travel_cards:
+                        best_card = travel_cards[0]
+                        response_text = f"""Based on your cards, **{best_card[0]}** ({best_card[1]}) is your best option for travel with {best_card[3]}% earn rate on travel.
+
+For international flights from the US, consider these cards from our database:
+- **Chase Sapphire Reserve**: 5x on travel, 1.5cpp value, $550 annual fee
+- **Amex Platinum**: 5x on flights/hotels, premium travel benefits, $695 annual fee  
+- **Capital One Venture X**: 10x on travel bookings, 2x everything else, $395 annual fee
+
+Would you like me to recommend specific cards to add to your wallet?"""
+                    else:
+                        response_text = """For international travel from the US, I recommend these travel-focused cards:
+
+**Premium Options:**
+- **Chase Sapphire Reserve**: 5x on travel, 1.5cpp value, excellent transfer partners
+- **Amex Platinum**: 5x on flights/hotels, premium lounge access, $695 annual fee
+
+**Value Options:**
+- **Capital One Venture X**: 10x on travel bookings, 2x everything else, $395 annual fee
+- **Chase Sapphire Preferred**: 5x on travel, 1.25cpp value, $95 annual fee
+
+Would you like me to show you personalized recommendations based on your current cards?"""
+            
+            # Card recommendation queries
+            elif any(word in query_lower for word in ["recommend", "suggest", "which card", "what card", "best card"]):
+                response_text = """I can help you find the best cards! Let me analyze your current wallet and suggest cards that would complement it.
+
+Would you like me to:
+1. Show personalized card recommendations?
+2. Analyze gaps in your current wallet?
+3. Recommend cards for specific categories (travel, dining, groceries)?
+
+Just ask and I'll help you optimize your credit card portfolio!"""
+            
+            # General queries - provide helpful response
+            else:
+                response_text = f"""I can help you with credit card optimization! Based on your query: "{user_query}"
+
+Here's what I can do:
+- Recommend which card to use for specific purchases
+- Suggest new cards to add to your wallet
+- Analyze your current cards and find gaps
+- Show deals and offers for your cards
+- Help optimize your rewards strategy
+
+Your current cards: {context if context else "No cards added yet"}
+
+What would you like to know?"""
+            
+            return {
+                "status": "success",
+                "response": response_text,
+                "note": "Response generated without OpenAI API. For enhanced responses, set OPENAI_API_KEY environment variable."
+            }
+        
+        # Load system prompt
+        system_prompt = load_system_prompt() or """You are an expert credit card rewards strategist. 
+        Your role is to help users optimize their credit card usage and maximize rewards.
+        Always base answers on provided card data context. Use USD ($) for all monetary values."""
         
         response = client.chat.completions.create(
             model="gpt-4o-mini",
