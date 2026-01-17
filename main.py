@@ -1695,7 +1695,7 @@ Do not include any explanation, only the JSON array."""
             
             # Fill remaining slots
             remaining = [c for c in all_candidate_cards if c not in recommendations]
-                    recommendations.extend(remaining[:5 - len(recommendations)])
+            recommendations.extend(remaining[:5 - len(recommendations)])
             
             return recommendations[:5]
     except Exception as e:
@@ -1963,7 +1963,7 @@ async def suggest_tool_for_query(user_query: str, user_id: int = 1):
             }
         # General queries - use enhanced_chat_response if API available, otherwise recommend_new_cards
         else:
-        client = get_openai_client()
+            client = get_openai_client()
             if client:
                 suggestion = {
                     "primary_tool": "enhanced_chat_response",
