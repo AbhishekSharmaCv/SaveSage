@@ -231,6 +231,24 @@ async def auto_seed_reward_rules(card_id: int, card_name: str):
             
             # Create reward rules from card data
             rules_created = 0
+            notes_parts = []
+            
+            # Add signup bonus info to notes if available
+            signup_bonus = matched_card.get("signup_bonus", {})
+            if signup_bonus and signup_bonus.get("amount", 0) > 0:
+                notes_parts.append(f"Signup bonus: {signup_bonus.get('amount')} {matched_card.get('reward_type', 'points')} after spending ${signup_bonus.get('spend', 0)} in {signup_bonus.get('days', 90)} days")
+            
+            # Add credits info from metadata if available
+            metadata = matched_card.get("_metadata", {})
+            if metadata:
+                credits = metadata.get("credits", [])
+                if credits:
+                    credit_descriptions = [c.get("description", "") for c in credits[:3] if c.get("description")]
+                    if credit_descriptions:
+                        notes_parts.append(f"Credits: {', '.join(credit_descriptions)}")
+            
+            base_notes = ". ".join(notes_parts) if notes_parts else "Auto-seeded from us_cards.json"
+            
             for category, earn_rate in matched_card.get("categories", {}).items():
                 if earn_rate > 0:
                     # Map category if needed
@@ -244,9 +262,11 @@ async def auto_seed_reward_rules(card_id: int, card_name: str):
                             (card_id, final_category)
                         )
                         if not await cur.fetchone():
+                            # Add category-specific note
+                            category_note = f"{base_notes}. {earn_rate}x on {final_category}"
                             await c.execute(
                                 "INSERT INTO reward_rules(card_id, category, earn_rate, notes) VALUES (?, ?, ?, ?)",
-                                (card_id, final_category, earn_rate, f"Auto-seeded from us_cards.json")
+                                (card_id, final_category, earn_rate, category_note)
                             )
                             rules_created += 1
             
@@ -1737,7 +1757,7 @@ async def recommend_travel_cards(user_id: int = 1, international: bool = True):
             if (card["name"], card["bank"]) not in existing_cards:
                 travel_rate = card.get("categories", {}).get("travel", 0)
                 if travel_rate >= 3:
-                    travel_cards.append({
+                    card_info = {
                         "name": card["name"],
                         "bank": card["bank"],
                         "reward_type": card["reward_type"],
@@ -1748,7 +1768,38 @@ async def recommend_travel_cards(user_id: int = 1, international: bool = True):
                         "transfer_partners": card.get("transfer_partners", []),
                         "notes": card.get("notes", ""),
                         "categories": card.get("categories", {})
-                    })
+                    }
+                    
+                    # Add credits and offers from metadata if available
+                    metadata = card.get("_metadata", {})
+                    if metadata:
+                        credits = metadata.get("credits", [])
+                        if credits:
+                            card_info["credits"] = [
+                                {
+                                    "description": c.get("description", ""),
+                                    "value": c.get("value", 0),
+                                    "weight": c.get("weight", 0)
+                                }
+                                for c in credits[:5]  # Limit to top 5 credits
+                            ]
+                        
+                        offers = metadata.get("offers", [])
+                        if offers:
+                            # Get current offer
+                            current_offer = offers[0] if offers else {}
+                            card_info["current_offer"] = {
+                                "spend": current_offer.get("spend", 0),
+                                "amount": current_offer.get("amount", []),
+                                "days": current_offer.get("days", 90),
+                                "details": current_offer.get("details", "")
+                            }
+                        
+                        # Add URL if available
+                        if metadata.get("url"):
+                            card_info["url"] = metadata.get("url")
+                    
+                    travel_cards.append(card_info)
         
         # Sort by travel rate and point value
         travel_cards.sort(key=lambda x: (x["travel_rate"], x["point_value"]), reverse=True)
